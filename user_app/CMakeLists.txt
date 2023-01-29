@@ -27,10 +27,10 @@ set(USER_APP_BUILD 1)
 set(ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)
 # set(EXTRA_COMPONENT_DIRS ${ROOT_DIR}/components/shared ${ROOT_DIR}/components/shared/drivers ${ROOT_DIR}/components/user/idf_stubs ${ROOT_DIR}/components/user ${CMAKE_CURRENT_LIST_DIR}/../components)
 
-set(EXTRA_COMPONENT_DIRS /home/chris/.espressif/esp-privilege-separation/components/shared
-                         /home/chris/.espressif/esp-privilege-separation/components/shared/drivers
-                         /home/chris/.espressif/esp-privilege-separation/components/user/idf_stubs
-                         /home/chris/.espressif/esp-privilege-separation/components/user
+set(EXTRA_COMPONENT_DIRS ${ROOT_DIR}/.espressif/esp-privilege-separation/components/shared
+                         ${ROOT_DIR}/.espressif/esp-privilege-separation/components/shared/drivers
+                         ${ROOT_DIR}/.espressif/esp-privilege-separation/components/user/idf_stubs
+                         ${ROOT_DIR}/.espressif/esp-privilege-separation/components/user
                          ${CMAKE_CURRENT_LIST_DIR}/../components)
 
 include(${IDF_PATH}/tools/cmake/project.cmake)
