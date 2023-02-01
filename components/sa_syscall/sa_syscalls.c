@@ -9,7 +9,7 @@ static const char *TAG_SYSCALL = "SYSCALL LOG";
 
 int sys_test_syscall(void *args)
 {
-    ESP_LOGI(TAG_SYSCALL, "THIS IS A SYSCALL!\n");
+    ESP_LOGI(TAG_SYSCALL, "THIS IS A SYSCALL!");
     return 0;
 }
 

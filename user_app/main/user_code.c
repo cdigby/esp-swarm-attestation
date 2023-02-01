@@ -2,7 +2,7 @@
 
 void user_main()
 {
-    ESP_LOGI(TAG_USER, "Userspace start\n");
+    ESP_LOGI(TAG_USER, "Userspace start");
 
     while (1)
     {

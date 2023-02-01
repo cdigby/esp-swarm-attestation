@@ -2,7 +2,7 @@
 
 #include "sa_syscall.h"
 
-#include "syscall_wrappers.h"
+#include "syscall_macros.h"
 #include "syscall_def.h"
 
 int usr_test_syscall(void *args)

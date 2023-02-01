@@ -1,13 +1,10 @@
 if(USER_APP_BUILD)
-    idf_component_register(
-        SRCS sa_wrappers.c
-        INCLUDE_DIRS include
-        REQUIRES syscall_wrapper
-    )
+    set(srcs sa_wrappers.c)
 else()
     set(srcs sa_syscalls.c)
-    idf_component_register(
-        SRCS sa_syscalls.c
-        INCLUDE_DIRS include
-    )
 endif()
+
+idf_component_register(
+    SRCS ${srcs}
+    INCLUDE_DIRS "include"
+)

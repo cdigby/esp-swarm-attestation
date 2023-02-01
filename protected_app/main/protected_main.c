@@ -6,12 +6,6 @@ IRAM_ATTR void user_app_exception_handler(void *arg)
     ESP_LOGE(TAG_KERNEL, "USER APP EXCEPTION OCCURRED\n");
 }
 
-int sys_test_syscall(void *args)
-{
-    ESP_LOGI(TAG_KERNEL, "THIS IS A SYSCALL!\n");
-    return 0;
-}
-
 // Protected app entry point
 void app_main()
 {
@@ -34,7 +28,7 @@ void app_main()
     // Main kernel loop
     while (1)
     {
-        ESP_LOGI(TAG_KERNEL, "kernel test\n");
+        // ESP_LOGI(TAG_KERNEL, "kernel test\n");
         vTaskDelay(10);
     }
 }
