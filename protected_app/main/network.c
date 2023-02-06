@@ -2,98 +2,129 @@
 
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    if (event_base != WIFI_EVENT)
     {
-        // START SCANNING
-        if (strcmp(NODE_PARENT, "") != 0)   // Only scan if a parent is specified
-        {
-            esp_wifi_scan_start(NULL, false);
-            ESP_LOGI(TAG_NETWORK, "Start scan");
-        }
+        return;
     }
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE)
+
+    switch (event_id)
     {
-        // LOOK FOR OUR PARENT AND CONNECT TO IT, OTHERWISE SCAN AGAIN
-        ESP_LOGI(TAG_NETWORK, "Scan complete");
 
-        // Find out how many access ponts were found
-        uint16_t scan_count = 0;
-        esp_wifi_scan_get_ap_num(&scan_count);
-
-        // Get scan records
-        wifi_ap_record_t *records = malloc(sizeof(wifi_ap_record_t) * scan_count);
-        esp_wifi_scan_get_ap_records(&scan_count, records);
-
-        // Look for our parent
-        bool found = false;
-        for (int i = 0; i < scan_count; i++)
+        case WIFI_EVENT_STA_START:
         {
-            if (strcmp((char*)records[i].ssid, NODE_PARENT) == 0)
+            // START SCANNING
+            if (strcmp(NODE_PARENT, "") != 0)   // Only scan if a parent is specified
             {
-                // Connect
-                ESP_LOGI(TAG_NETWORK, "Found parent node: %s", NODE_PARENT);
-                wifi_config_t cfg =
-                {
-                    .sta =
-                    {
-                        .ssid = NODE_PARENT,
-                        .password = NODE_PASSWORD,
-                    },
-                };
-                // strcpy((char*)cfg.sta.ssid, NODE_PARENT);
-                // strcpy((char*)cfg.sta.password, NODE_PASSWORD);
-                esp_wifi_set_config(WIFI_IF_STA, &cfg);
-                esp_wifi_connect();
-                found = true;
-                break;
+                esp_wifi_scan_start(NULL, false);
+                ESP_LOGI(TAG_NETWORK, "Start scan");
             }
         }
+        break;
 
-        if (found == false)
+        case WIFI_EVENT_SCAN_DONE:
         {
-            esp_wifi_scan_start(NULL, false);
-            ESP_LOGI(TAG_NETWORK, "Parent not found, scan again");
-        }
+            // LOOK FOR OUR PARENT AND CONNECT TO IT, OTHERWISE SCAN AGAIN
+            ESP_LOGI(TAG_NETWORK, "Scan complete");
 
-        free(records);
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED)
-    {
-        // REGISTER SOMEWHERE THAT WE HAVE CONNECTED TO OUR PARENT
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
-    {
-        // PARENT LOST, START SCANNING AGAIN
-        if (strcmp(NODE_PARENT, "") != 0)
-        {
-            ESP_LOGW(TAG_NETWORK, "Lost connection to %s, restart scanning", NODE_PARENT);
-            esp_wifi_scan_start(NULL, false);
-            ESP_LOGI(TAG_NETWORK, "Start scan");
+            // Find out how many access ponts were found
+            uint16_t scan_count = 0;
+            esp_wifi_scan_get_ap_num(&scan_count);
+
+            // Get scan records
+            wifi_ap_record_t *records = malloc(sizeof(wifi_ap_record_t) * scan_count);
+            esp_wifi_scan_get_ap_records(&scan_count, records);
+
+            // Look for our parent
+            bool found = false;
+            for (int i = 0; i < scan_count; i++)
+            {
+                if (strcmp((char*)records[i].ssid, NODE_PARENT) == 0)
+                {
+                    // Connect
+                    ESP_LOGI(TAG_NETWORK, "Found parent node: %s", NODE_PARENT);
+                    wifi_config_t cfg =
+                    {
+                        .sta =
+                        {
+                            .ssid = NODE_PARENT,
+                            .password = NODE_PASSWORD,
+                        },
+                    };
+                    esp_wifi_set_config(WIFI_IF_STA, &cfg);
+                    esp_wifi_connect();
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found == false)
+            {
+                esp_wifi_scan_start(NULL, false);
+                ESP_LOGI(TAG_NETWORK, "Parent not found, scan again");
+            }
+
+            free(records);
         }
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED)
-    {
-        // A NODE JUST CONNECTED TO US, REGISTER IT
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED)
-    {
-        // A NODE JUST DISCONNECTED FROM US, UNREGISTER IT
+        break;
+
+        case WIFI_EVENT_STA_CONNECTED:
+        {
+            // REGISTER SOMEWHERE THAT WE HAVE CONNECTED TO OUR PARENT
+        }
+        break;
+
+        case WIFI_EVENT_STA_DISCONNECTED:
+        {
+            // PARENT LOST, START SCANNING AGAIN
+            if (strcmp(NODE_PARENT, "") != 0)
+            {
+                ESP_LOGW(TAG_NETWORK, "Lost connection to %s, restart scanning", NODE_PARENT);
+                esp_wifi_scan_start(NULL, false);
+                ESP_LOGI(TAG_NETWORK, "Start scan");
+            }
+        }
+        break;
+
+        case WIFI_EVENT_AP_STACONNECTED:
+        {
+            // A NODE JUST CONNECTED TO US, REGISTER IT
+        }
+        break;
+
+        case WIFI_EVENT_AP_STADISCONNECTED:
+        {
+            // A NODE JUST DISCONNECTED FROM US, UNREGISTER IT
+        }
+        break;
     }
 }
 
 void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    if (event_base != IP_EVENT)
     {
-        // xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        return;
     }
-    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP)
-    {
 
-    }
-    else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED)
+    switch (event_id)
     {
+        case IP_EVENT_STA_GOT_IP:
+        {
+            // xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        }
+        break;
 
+        case IP_EVENT_STA_LOST_IP:
+        {
+
+        }
+        break;
+
+        case IP_EVENT_AP_STAIPASSIGNED:
+        {
+
+        }
+        break;
     }
 }
 
