@@ -15,6 +15,11 @@
 
 #include "build_config.h"
 
+typedef struct
+{
+
+} network_state_t;
+
 static const char *TAG_NETWORK = "NETWORK LOG";
 
-void initialise_wifi();
+void network_init();

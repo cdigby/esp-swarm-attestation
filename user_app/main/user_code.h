@@ -12,6 +12,6 @@
 
 #include "esp_log.h"
 
-#include "sa_syscall.h"
+#include "comms.h"
 
 static const char *TAG_USER = "USERSPACE LOG";

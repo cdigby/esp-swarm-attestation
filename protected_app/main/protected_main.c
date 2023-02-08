@@ -18,8 +18,10 @@ void app_main()
         ESP_LOGE(TAG_KERNEL, "Failed to initialize protected environment %d\n", ret);
     }
 
-    // Start wifi access point
-    initialise_wifi();
+    // esp_priv_access_set_periph_perm(PA_GPIO, PA_WORLD_1, PA_PERM_ALL);
+
+    // Initialise network, start wifi access point
+    network_init();
 
     // Boot user app
     ret = esp_priv_access_user_boot();
@@ -31,7 +33,6 @@ void app_main()
     // Main kernel loop
     while (1)
     {
-        // ESP_LOGI(TAG_KERNEL, "kernel test\n");
-        vTaskDelay(10);
+        vTaskDelay(1000);
     }
 }

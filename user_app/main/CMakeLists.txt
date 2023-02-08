@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "user_code.c"
+    SRCS "comms.c" "user_code.c"
     INCLUDE_DIRS ".."
     REQUIRES sa_syscall
 )

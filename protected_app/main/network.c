@@ -1,5 +1,7 @@
 #include "network.h"
 
+static network_state_t net_state;
+
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     if (event_base != WIFI_EVENT)
@@ -128,21 +130,25 @@ void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, 
     }
 }
 
-void initialise_wifi()
+void network_init()
 {
+    // Init NVS flash
     nvs_flash_init();
-    esp_netif_init();
-    esp_event_loop_create_default();
 
+    // Create event loop, register event handlers
+    // Event handlers get a pointer to the network state when they are called
+    esp_event_loop_create_default();
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, &net_state, NULL);
+    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, &net_state, NULL);
+
+    // Create default net interfaces
+    esp_netif_init();
     esp_netif_create_default_wifi_sta();
     esp_netif_create_default_wifi_ap();
 
+    // Configure and start wifi
     wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_cfg);
-
-    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
-    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL, NULL);
-
     esp_wifi_set_mode(WIFI_MODE_APSTA);
     wifi_config_t ap_cfg =
     {
