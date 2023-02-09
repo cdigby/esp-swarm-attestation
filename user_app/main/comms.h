@@ -10,12 +10,12 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 
-#include "unistd.h"
-#include "fcntl.h"
 #include "errno.h"
 
 #include "esp_log.h"
 #include "esp_err.h"
+
+#define CMD_NODE_NAME   0x01
 
 #define COMMS_TCP_PORT      3333
 #define COMMS_BUFFER_SIZE   256
@@ -43,6 +43,7 @@ typedef struct
     tcp_host_state_t state;
     int listen_sock;
     tcp_conn_t conns[TCP_HOST_MAX_CONNS];
+    int num_conns;
     uint8_t tx_buf[COMMS_BUFFER_SIZE];
     uint8_t rx_buf[COMMS_BUFFER_SIZE];
 } tcp_host_t;
