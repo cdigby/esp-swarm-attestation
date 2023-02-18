@@ -1,7 +1,15 @@
 #include "comms.h"
 
 static tcp_host_t tcp_host;
-// static tcp_client_t tcp_client;
+static tcp_client_t tcp_client;
+
+// Get the current time in ms
+static int64_t comms_get_time_ms()
+{
+    struct timeval tv_now;
+    gettimeofday(&tv_now, NULL);
+    return (int64_t)(((int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec) / 1000);
+}
 
 // Process a command
 // cmd is the command code
@@ -12,9 +20,29 @@ static void comms_cmd_process(uint8_t cmd, int sock, uint8_t* tx_buf, uint8_t *r
 
 }
 
+// Register a connection as closed on the tcp host
+static void tcp_host_close_conn(int sock)
+{
+    for (int i = 0; i < TCP_HOST_MAX_CONNS; i++)
+    {
+        if (tcp_host.conns[i].sock == sock)
+        {
+            close(tcp_host.conns[i].sock);
+            tcp_host.conns[i].open = false;
+            tcp_host.num_conns -= 1;
+            ESP_LOGW(TAG_TCP_HOST, "Lost connection with %s", tcp_host.conns[i].name);
+        }
+    }
+}
+
+// TCP host thread
 static void tcp_host_task(void *pvParameters)
 {
+    int rlen = 0;
     ESP_LOGI(TAG_TCP_HOST, "Started TCP host task");
+
+    // Update ping timer
+    tcp_host.ping_timer = comms_get_time_ms();
 
     // Socket options
     int opt_keep_alive = 1;                                 // Keep socket alive
@@ -90,6 +118,7 @@ static void tcp_host_task(void *pvParameters)
                         memcpy(new_conn->name, tcp_host.rx_buf, name_len);
                         new_conn->open = true;
                         tcp_host.num_conns += 1;
+                        ESP_LOGI(TAG_TCP_HOST, "New client: %s", new_conn->name);
                     }
                 }
             }
@@ -117,24 +146,83 @@ static void tcp_host_task(void *pvParameters)
         {
             if (client_poll[i].revents & POLLIN)
             {
-                recv(client_poll[i].fd, tcp_host.rx_buf, 1, MSG_WAITALL);
-                comms_cmd_process(tcp_host.rx_buf[0], client_poll[i].fd, tcp_host.tx_buf, tcp_host.rx_buf);
+                rlen = recv(client_poll[i].fd, tcp_host.rx_buf, 1, MSG_WAITALL);
+                if (rlen == 1)
+                {
+                    comms_cmd_process(tcp_host.rx_buf[0], client_poll[i].fd, tcp_host.tx_buf, tcp_host.rx_buf);
+                }
+                else
+                {
+                    tcp_host_close_conn(client_poll[i].fd);
+                }
             }
         }
 
-
-
-        // SEND ANY COMMANDS WE HAVE QUEUED IF THE DESTINATION CLIENT IS CONNECTED (just one? or all of them?)
-
-        // How do we know if a connection was closed?
         vTaskDelay(1);
     }
 }
 
+// TCP client thread
+static void tcp_client_task(void *pvParameters)
+{
+    ESP_LOGI(TAG_TCP_CLIENT, "Started TCP client task");
+
+    // Socket options
+    int opt_no_delay = 1;   // Send data as soon as it is available, without buffering (disable Nagle's Algorithm)
+
+    while (1)
+    {
+        // Delay before attempting connection again
+        vTaskDelay(1000);
+
+        // Try and get the host address from the kernel
+        uint32_t host_addr = 0;
+        if (usr_sa_network_get_gateway_addr(&host_addr) == -1)
+        {
+            continue;   // Abort
+        }
+
+        // Create socket
+        tcp_client.host.sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+        if (tcp_client.host.sock < 0)
+        {
+            ESP_LOGE(TAG_TCP_CLIENT, "Error creating socket (%s)", strerror(errno));
+            continue;
+        }
+
+        // Set socket options
+        setsockopt(tcp_client.host.sock, IPPROTO_TCP, TCP_NODELAY, &opt_no_delay, sizeof(opt_no_delay));
+
+        // Connect to host
+        int err = connect(tcp_client.host.sock, (struct sockaddr *)&host_addr, sizeof(struct sockaddr_in));
+        if (err != 0)
+        {
+            ESP_LOGE(TAG_TCP_CLIENT, "Error connecting to host (%s)", strerror(errno));
+            close(tcp_client.host.sock);
+            continue;
+        }
+
+        tcp_client.host.open = true;
+        ESP_LOGI(TAG_TCP_CLIENT, "Connected to %s", tcp_client.host.name);
+        
+        // Client loop
+        while (1)
+        {
+
+            vTaskDelay(1);
+        }
+
+        // Cleanup after exiting loop
+        close(tcp_client.host.sock);
+        tcp_client.host.open = false;
+        ESP_LOGW(TAG_TCP_CLIENT, "Connection with %s closed", tcp_client.host.name);
+    }
+}
+
+// Start the TCP host
 bool tcp_host_start()
 {
     // Reset state
-    tcp_host.state = TCP_HOST_IDLE;
     for (int i = 0; i < TCP_HOST_MAX_CONNS; i++)
     {
         tcp_host.conns[i].open = false;
@@ -182,6 +270,19 @@ bool tcp_host_start()
 
     // Start TCP host task
     xTaskCreate(tcp_host_task, "tcp_host", 2048, NULL, 10, NULL);
+
+    return true;
+}
+
+// Start the TCP client
+bool tcp_client_start()
+{
+    // We are currently hardcoding each node's parent in the build config, so we already know the name
+    // A better implementation would be to have the host transmit its name to the client upon connection
+    strcpy(tcp_client.host.name, NODE_PARENT);
+    tcp_client.host.open = false;
+    
+    xTaskCreate(tcp_client_task, "tcp_client", 2048, NULL, 10, NULL);
 
     return true;
 }

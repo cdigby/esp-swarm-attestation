@@ -7,9 +7,10 @@ void user_main()
     // Wifi is initialised before user app boot, so we can start tcp host immediately
     tcp_host_start();
 
+    tcp_client_start();
+
     while (1)
     {
-        // usr_test_syscall(NULL);
         vTaskDelay(1000);
     }
 }

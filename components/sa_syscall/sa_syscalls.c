@@ -1,15 +1,14 @@
-// This file implements the kernel-space functionality of our syscalls
-
 #include <stdio.h>
 #include <string.h>
 
 #include "esp_log.h"
 
+#include "sa_network.h"
+
 static const char *TAG_SYSCALL = "SYSCALL LOG";
 
-int sys_test_syscall(void *args)
+int sys_sa_network_get_gateway_addr(uint32_t *result)
 {
-    ESP_LOGI(TAG_SYSCALL, "THIS IS A SYSCALL!");
-    return 0;
+    return sa_network_get_gateway_addr(result);
 }
 

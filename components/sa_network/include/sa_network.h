@@ -13,13 +13,9 @@
 #include "esp_event_base.h"
 #include "esp_event.h"
 
-#include "build_config.h"
-
-typedef struct
-{
-
-} network_state_t;
+#include "sa_build_config.h"
 
 static const char *TAG_NETWORK = "NETWORK LOG";
 
-void network_init();
+void sa_network_init();
+int sa_network_get_gateway_addr(uint32_t *result);

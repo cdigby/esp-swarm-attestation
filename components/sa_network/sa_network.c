@@ -1,8 +1,11 @@
-#include "network.h"
+#include "sa_network.h"
 
-static network_state_t net_state;
+static esp_netif_t *ap_netif;
+static esp_netif_t *sta_netif;
 
-void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static bool connected_to_parent;
+
+static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     if (event_base != WIFI_EVENT)
     {
@@ -101,7 +104,7 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
-void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     if (event_base != IP_EVENT)
     {
@@ -112,13 +115,13 @@ void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, 
     {
         case IP_EVENT_STA_GOT_IP:
         {
-            // xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+            connected_to_parent = true;
         }
         break;
 
         case IP_EVENT_STA_LOST_IP:
         {
-
+            connected_to_parent = false;
         }
         break;
 
@@ -130,22 +133,40 @@ void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, 
     }
 }
 
-void network_init()
+// If connected to parent, return 0 and store the parent's gateway address in result
+// If not connected, return -1
+int sa_network_get_gateway_addr(uint32_t *result)
 {
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(sta_netif, &ip_info);
+
+    if (connected_to_parent == true)
+    {
+        *result = ip_info.gw.addr;
+        return 0;
+    }
+    
+    return -1;
+}
+
+void sa_network_init()
+{
+    connected_to_parent = false;
+
     // Init NVS flash
     nvs_flash_init();
 
     // Create event loop, register event handlers
     // Event handlers get a pointer to the network state when they are called
     esp_event_loop_create_default();
-    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, &net_state, NULL);
-    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, &net_state, NULL);
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
+    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL, NULL);
 
     // Create default net interfaces
     esp_netif_init();
-    esp_netif_create_default_wifi_sta();
-    esp_netif_create_default_wifi_ap();
-
+    ap_netif = esp_netif_create_default_wifi_ap();
+    sta_netif = esp_netif_create_default_wifi_sta();
+    
     // Configure and start wifi
     wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_cfg);

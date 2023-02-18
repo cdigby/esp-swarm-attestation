@@ -1,5 +1,7 @@
-// This header file declares the userspace wrappers for our syscalls
-
 #pragma once
 
-int usr_test_syscall(void *args);
+#include <stdint.h>
+
+// If the node is connected to its parent, set result to the parent's gateway address
+// Returns 0 if successful, otherwise -1
+int usr_sa_network_get_gateway_addr(uint32_t *result);
