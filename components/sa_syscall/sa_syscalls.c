@@ -7,8 +7,8 @@
 
 static const char *TAG_SYSCALL = "SYSCALL LOG";
 
-int sys_sa_network_get_gateway_addr(uint32_t *result)
+int sys_sa_network_get_gateway_ip(uint32_t *result)
 {
-    return sa_network_get_gateway_addr(result);
+    return sa_network_get_gateway_ip(result);
 }
 

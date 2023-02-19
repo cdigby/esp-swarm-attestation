@@ -1,1 +1,1 @@
-100 common sa_network_get_gateway_addr sys_sa_network_get_gateway_addr
+100 common sa_network_get_gateway_ip sys_sa_network_get_gateway_ip

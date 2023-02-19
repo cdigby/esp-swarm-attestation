@@ -2,7 +2,7 @@
 
 // Change this to the ID of the node we want to build for
 // 1 = A, 2 = B, etc.
-#define NODE_ID 2
+#define NODE_ID 3
 
 //////////////////////////////////////
 #define NODE_PASSWORD "test1234"

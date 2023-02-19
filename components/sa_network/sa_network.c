@@ -3,7 +3,8 @@
 static esp_netif_t *ap_netif;
 static esp_netif_t *sta_netif;
 
-static bool connected_to_parent;
+// static bool connected_to_parent = false;
+static bool connection_lost = false;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
@@ -20,61 +21,72 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             // START SCANNING
             if (strcmp(NODE_PARENT, "") != 0)   // Only scan if a parent is specified
             {
-                esp_wifi_scan_start(NULL, false);
-                ESP_LOGI(TAG_NETWORK, "Start scan");
-            }
-        }
-        break;
+                // esp_wifi_scan_start(NULL, false);
+                // ESP_LOGI(TAG_NETWORK, "Start scanning for parent");
 
-        case WIFI_EVENT_SCAN_DONE:
-        {
-            // LOOK FOR OUR PARENT AND CONNECT TO IT, OTHERWISE SCAN AGAIN
-            ESP_LOGI(TAG_NETWORK, "Scan complete");
-
-            // Find out how many access ponts were found
-            uint16_t scan_count = 0;
-            esp_wifi_scan_get_ap_num(&scan_count);
-
-            // Get scan records
-            wifi_ap_record_t *records = malloc(sizeof(wifi_ap_record_t) * scan_count);
-            esp_wifi_scan_get_ap_records(&scan_count, records);
-
-            // Look for our parent
-            bool found = false;
-            for (int i = 0; i < scan_count; i++)
-            {
-                if (strcmp((char*)records[i].ssid, NODE_PARENT) == 0)
+                ESP_LOGI(TAG_NETWORK, "Attempt connection to %s", NODE_PARENT);
+                wifi_config_t cfg =
                 {
-                    // Connect
-                    ESP_LOGI(TAG_NETWORK, "Found parent node: %s", NODE_PARENT);
-                    wifi_config_t cfg =
+                    .sta =
                     {
-                        .sta =
-                        {
-                            .ssid = NODE_PARENT,
-                            .password = NODE_PASSWORD,
-                        },
-                    };
-                    esp_wifi_set_config(WIFI_IF_STA, &cfg);
-                    esp_wifi_connect();
-                    found = true;
-                    break;
-                }
+                        .ssid = NODE_PARENT,
+                        .password = NODE_PASSWORD,
+                    },
+                };
+                esp_wifi_set_config(WIFI_IF_STA, &cfg);
+                esp_wifi_connect();
             }
-
-            if (found == false)
-            {
-                esp_wifi_scan_start(NULL, false);
-                ESP_LOGI(TAG_NETWORK, "Parent not found, scan again");
-            }
-
-            free(records);
         }
         break;
+
+        // case WIFI_EVENT_SCAN_DONE:
+        // {
+        //     // LOOK FOR OUR PARENT AND CONNECT TO IT, OTHERWISE SCAN AGAIN
+
+        //     // Find out how many access ponts were found
+        //     uint16_t scan_count = 0;
+        //     esp_wifi_scan_get_ap_num(&scan_count);
+
+        //     // Get scan records
+        //     wifi_ap_record_t *records = malloc(sizeof(wifi_ap_record_t) * scan_count);
+        //     esp_wifi_scan_get_ap_records(&scan_count, records);
+
+        //     // Look for our parent
+        //     bool found = false;
+        //     for (int i = 0; i < scan_count; i++)
+        //     {
+        //         if (strcmp((char*)records[i].ssid, NODE_PARENT) == 0)
+        //         {
+        //             // Connect
+        //             ESP_LOGI(TAG_NETWORK, "Found parent node: %s", NODE_PARENT);
+        //             wifi_config_t cfg =
+        //             {
+        //                 .sta =
+        //                 {
+        //                     .ssid = NODE_PARENT,
+        //                     .password = NODE_PASSWORD,
+        //                 },
+        //             };
+        //             esp_wifi_set_config(WIFI_IF_STA, &cfg);
+        //             esp_wifi_connect();
+        //             found = true;
+        //             break;
+        //         }
+        //     }
+
+        //     if (found == false)
+        //     {
+        //         esp_wifi_scan_start(NULL, false);
+        //     }
+
+        //     free(records);
+        // }
+        // break;
 
         case WIFI_EVENT_STA_CONNECTED:
         {
-            // REGISTER SOMEWHERE THAT WE HAVE CONNECTED TO OUR PARENT
+            ESP_LOGI(TAG_NETWORK, "Connected to parent: %s", NODE_PARENT);
+            connection_lost = false;
         }
         break;
 
@@ -83,22 +95,29 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             // PARENT LOST, START SCANNING AGAIN
             if (strcmp(NODE_PARENT, "") != 0)
             {
-                ESP_LOGW(TAG_NETWORK, "Lost connection to %s, restart scanning", NODE_PARENT);
-                esp_wifi_scan_start(NULL, false);
-                ESP_LOGI(TAG_NETWORK, "Start scan");
+                // ESP_LOGW(TAG_NETWORK, "Lost connection to %s, restarting scanning", NODE_PARENT);
+                // esp_wifi_scan_start(NULL, false);
+                if (connection_lost == false)
+                {
+                    ESP_LOGW(TAG_NETWORK, "Lost connection to %s, or connection failed. Will retry", NODE_PARENT);
+                    connection_lost = true;
+                }
+                
+                vTaskDelay(2000);
+                esp_wifi_connect();
             }
         }
         break;
 
         case WIFI_EVENT_AP_STACONNECTED:
         {
-            // A NODE JUST CONNECTED TO US, REGISTER IT
+            ESP_LOGI(TAG_NETWORK, "A node just connected to our AP");
         }
         break;
 
         case WIFI_EVENT_AP_STADISCONNECTED:
         {
-            // A NODE JUST DISCONNECTED FROM US, UNREGISTER IT
+            ESP_LOGW(TAG_NETWORK, "A node just disconnected from our AP");
         }
         break;
     }
@@ -115,13 +134,13 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t eve
     {
         case IP_EVENT_STA_GOT_IP:
         {
-            connected_to_parent = true;
+            // connected_to_parent = true;
         }
         break;
 
         case IP_EVENT_STA_LOST_IP:
         {
-            connected_to_parent = false;
+            // connected_to_parent = false;
         }
         break;
 
@@ -133,14 +152,14 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t eve
     }
 }
 
-// If connected to parent, return 0 and store the parent's gateway address in result
+// If connected to parent, return 0 and store the parent's gateway ip in result
 // If not connected, return -1
-int sa_network_get_gateway_addr(uint32_t *result)
+int sa_network_get_gateway_ip(uint32_t *result)
 {
     esp_netif_ip_info_t ip_info;
     esp_netif_get_ip_info(sta_netif, &ip_info);
 
-    if (connected_to_parent == true)
+    if (ip_info.gw.addr != 0)
     {
         *result = ip_info.gw.addr;
         return 0;
@@ -151,7 +170,7 @@ int sa_network_get_gateway_addr(uint32_t *result)
 
 void sa_network_init()
 {
-    connected_to_parent = false;
+    // connected_to_parent = false;
 
     // Init NVS flash
     nvs_flash_init();
@@ -166,6 +185,23 @@ void sa_network_init()
     esp_netif_init();
     ap_netif = esp_netif_create_default_wifi_ap();
     sta_netif = esp_netif_create_default_wifi_sta();
+
+    // The default IP address for the access point is 192.168.4.1, but we need to change the 3rd number to be unique for each node:
+    // If we leave everything as default, the TCP client will try to connect to 192.168.4.1 and end up connecting to the TCP server running on the same node.
+    // If we only change the 4th number, a node could be using 192.168.4.2 for its access point and then be assigned the same IP for its station by its parent node,
+    // which breaks TCP sockets (connect() results in the error: Software caused connection abort).
+    // 
+    // By changing the 3rd number according to the node ID, each node is guaranteed to be able to freely assign IPs in the range 192.168.NODE_ID.1-255
+    // A better solution will be needed if we want more than 255 nodes on the network.
+    esp_netif_ip_info_t ip_info;
+    IP4_ADDR(&ip_info.ip, 192,168,NODE_ID,1);
+	IP4_ADDR(&ip_info.gw, 192,168,NODE_ID,1);
+	IP4_ADDR(&ip_info.netmask, 255,255,255,0);
+	esp_netif_dhcps_stop(ap_netif);
+	esp_netif_set_ip_info(ap_netif, &ip_info);
+	esp_netif_dhcps_start(ap_netif);
+
+    ESP_LOGI(TAG_NETWORK, "ap ip: " IPSTR ", mask: " IPSTR ", gw: " IPSTR, IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask), IP2STR(&ip_info.gw));
     
     // Configure and start wifi
     wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();

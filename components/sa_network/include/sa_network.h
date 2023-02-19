@@ -18,4 +18,4 @@
 static const char *TAG_NETWORK = "NETWORK LOG";
 
 void sa_network_init();
-int sa_network_get_gateway_addr(uint32_t *result);
+int sa_network_get_gateway_ip(uint32_t *result);
