@@ -3,7 +3,6 @@
 static esp_netif_t *ap_netif;
 static esp_netif_t *sta_netif;
 
-// static bool connected_to_parent = false;
 static bool connection_lost = false;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -18,12 +17,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
 
         case WIFI_EVENT_STA_START:
         {
-            // START SCANNING
-            if (strcmp(NODE_PARENT, "") != 0)   // Only scan if a parent is specified
+            // Wifi started, attempt to connect to parent
+            if (strcmp(NODE_PARENT, "") != 0)   // Do nothing if no parent is specified
             {
-                // esp_wifi_scan_start(NULL, false);
-                // ESP_LOGI(TAG_NETWORK, "Start scanning for parent");
-
                 ESP_LOGI(TAG_NETWORK, "Attempt connection to %s", NODE_PARENT);
                 wifi_config_t cfg =
                 {
@@ -39,50 +35,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         }
         break;
 
-        // case WIFI_EVENT_SCAN_DONE:
-        // {
-        //     // LOOK FOR OUR PARENT AND CONNECT TO IT, OTHERWISE SCAN AGAIN
-
-        //     // Find out how many access ponts were found
-        //     uint16_t scan_count = 0;
-        //     esp_wifi_scan_get_ap_num(&scan_count);
-
-        //     // Get scan records
-        //     wifi_ap_record_t *records = malloc(sizeof(wifi_ap_record_t) * scan_count);
-        //     esp_wifi_scan_get_ap_records(&scan_count, records);
-
-        //     // Look for our parent
-        //     bool found = false;
-        //     for (int i = 0; i < scan_count; i++)
-        //     {
-        //         if (strcmp((char*)records[i].ssid, NODE_PARENT) == 0)
-        //         {
-        //             // Connect
-        //             ESP_LOGI(TAG_NETWORK, "Found parent node: %s", NODE_PARENT);
-        //             wifi_config_t cfg =
-        //             {
-        //                 .sta =
-        //                 {
-        //                     .ssid = NODE_PARENT,
-        //                     .password = NODE_PASSWORD,
-        //                 },
-        //             };
-        //             esp_wifi_set_config(WIFI_IF_STA, &cfg);
-        //             esp_wifi_connect();
-        //             found = true;
-        //             break;
-        //         }
-        //     }
-
-        //     if (found == false)
-        //     {
-        //         esp_wifi_scan_start(NULL, false);
-        //     }
-
-        //     free(records);
-        // }
-        // break;
-
         case WIFI_EVENT_STA_CONNECTED:
         {
             ESP_LOGI(TAG_NETWORK, "Connected to parent: %s", NODE_PARENT);
@@ -92,14 +44,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
 
         case WIFI_EVENT_STA_DISCONNECTED:
         {
-            // PARENT LOST, START SCANNING AGAIN
+            // Connection to parent failed or was lost, delay and then try again
             if (strcmp(NODE_PARENT, "") != 0)
             {
-                // ESP_LOGW(TAG_NETWORK, "Lost connection to %s, restarting scanning", NODE_PARENT);
-                // esp_wifi_scan_start(NULL, false);
-                if (connection_lost == false)
+                if (connection_lost == false)   // Flag so this message doesn't spam logs
                 {
-                    ESP_LOGW(TAG_NETWORK, "Lost connection to %s, or connection failed. Will retry", NODE_PARENT);
+                    ESP_LOGW(TAG_NETWORK, "Connection to %s failed or was otherwise lost", NODE_PARENT);
                     connection_lost = true;
                 }
                 
@@ -134,13 +84,13 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t eve
     {
         case IP_EVENT_STA_GOT_IP:
         {
-            // connected_to_parent = true;
+            
         }
         break;
 
         case IP_EVENT_STA_LOST_IP:
         {
-            // connected_to_parent = false;
+            
         }
         break;
 
@@ -170,8 +120,6 @@ int sa_network_get_gateway_ip(uint32_t *result)
 
 void sa_network_init()
 {
-    // connected_to_parent = false;
-
     // Init NVS flash
     nvs_flash_init();
 

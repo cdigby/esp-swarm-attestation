@@ -30,7 +30,7 @@ void app_main()
         ESP_LOGE(TAG_KERNEL, "Failed to boot user app %d\n", ret);
     }
 
-    // Main kernel loop
+    // Main loop for protected app
     while (1)
     {
         vTaskDelay(1000);

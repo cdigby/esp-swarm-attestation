@@ -35,6 +35,13 @@
 
 typedef struct
 {
+    uint8_t cmd_code;   // Command code
+    size_t data_len;    // If > 0, data points to extra data that must be freed after processing
+    uint8_t *data;
+} comms_cmd_t;
+
+typedef struct
+{
     bool open;
     int sock;
     char name[64];
@@ -62,7 +69,6 @@ typedef struct
     uint8_t rx_buf[COMMS_BUFFER_SIZE];
 } tcp_client_t;
 
-static const char *TAG_TCP_SERVER = "TCP SERVER LOG";
-static const char *TAG_TCP_CLIENT = "TCP CLIENT LOG";
+static const char *TAG_COMMS = "COMMS LOG";
 
 bool comms_start();
