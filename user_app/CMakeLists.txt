@@ -31,6 +31,7 @@ set(EXTRA_COMPONENT_DIRS
     ${ROOT_DIR}/.espressif/esp-privilege-separation/components/user/idf_stubs
     ${ROOT_DIR}/.espressif/esp-privilege-separation/components/shared
     ${CMAKE_CURRENT_LIST_DIR}/../components
+    ${CMAKE_CURRENT_LIST_DIR}/components
 )
 
 include(${IDF_PATH}/tools/cmake/project.cmake)

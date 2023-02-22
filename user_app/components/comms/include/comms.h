@@ -8,6 +8,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 
 #include "lwip/err.h"
 #include "lwip/sockets.h"
@@ -23,7 +24,8 @@
 #define CMD_NODE_NAME   0x01
 
 #define COMMS_TCP_PORT      3333
-#define COMMS_BUFFER_SIZE   256
+#define COMMS_BUFFER_SIZE   256     // Size in bytes of tx and rx buffers for TCP client and server
+#define COMMS_QUEUE_LENGTH  32      // Number of commands that each connection can have queued for transmission
 
 #define TCP_SERVER_MAX_CONNS      10
 
@@ -36,6 +38,7 @@ typedef struct
     bool open;
     int sock;
     char name[64];
+    QueueHandle_t cmd_queue;
 } tcp_conn_t;
 
 typedef struct
@@ -62,5 +65,4 @@ typedef struct
 static const char *TAG_TCP_SERVER = "TCP SERVER LOG";
 static const char *TAG_TCP_CLIENT = "TCP CLIENT LOG";
 
-bool tcp_server_start();
-bool tcp_client_start();
+bool comms_start();

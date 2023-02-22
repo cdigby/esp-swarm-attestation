@@ -239,12 +239,13 @@ static void tcp_client_task(void *pvParameters)
 }
 
 // Start the TCP server
-bool tcp_server_start()
+static bool tcp_server_start()
 {
     // Initial server state
     for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
     {
         tcp_server.conns[i].open = false;
+        tcp_server.conns[i].cmd_queue = xQueueCreate()
     }
     tcp_server.num_conns = 0;
 
@@ -294,7 +295,7 @@ bool tcp_server_start()
 }
 
 // Start the TCP client
-bool tcp_client_start()
+static void tcp_client_start()
 {
     // Initial client state
     strcpy(tcp_client.node_name, NODE_SSID);
@@ -307,5 +308,19 @@ bool tcp_client_start()
     
     xTaskCreate(tcp_client_task, "tcp_client", 2048, NULL, 10, NULL);
 
+    return true;
+}
+
+// Start TCP server and client for comms
+bool comms_start()
+{
+    // Server start can fail (client start can't)
+    // Return early if server start fails
+    if (tcp_server_start() == false)
+    {
+        return false;
+    }
+    
+    tcp_client_start();
     return true;
 }
