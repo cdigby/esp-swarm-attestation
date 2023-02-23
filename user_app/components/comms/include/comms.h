@@ -21,11 +21,15 @@
 #include "sa_build_config.h"
 #include "sa_syscall.h"
 
-#define CMD_NODE_NAME   0x01
+#define CMD_NODE_NAME               0x01    // Transmit the node's name
+#define CMD_HEARTBEAT_REQUEST       0x02
+#define CMD_HEARTBEAT_RESPONSE      0x03
 
 #define COMMS_TCP_PORT      3333
 #define COMMS_BUFFER_SIZE   256     // Size in bytes of tx and rx buffers for TCP client and server
 #define COMMS_QUEUE_LENGTH  32      // Number of commands that each connection can have queued for transmission
+
+#define COMMS_HEARTBEAT_TIMEOUT_MS   5000
 
 #define TCP_SERVER_MAX_CONNS      10
 
@@ -44,6 +48,7 @@ typedef struct
 {
     bool open;
     int sock;
+    int64_t ping_timer;
     char name[64];
     QueueHandle_t cmd_queue;
 } tcp_conn_t;
@@ -54,7 +59,6 @@ typedef struct
 
     tcp_conn_t conns[TCP_SERVER_MAX_CONNS];
     int num_conns;
-    int64_t ping_timer;
 
     uint8_t tx_buf[COMMS_BUFFER_SIZE];
     uint8_t rx_buf[COMMS_BUFFER_SIZE];

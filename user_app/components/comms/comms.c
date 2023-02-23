@@ -15,43 +15,122 @@ static void comms_drop_connection(tcp_conn_t *conn, int err)
 {
     close(conn->sock);
     conn->open = false;
-    ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", strerror(err));
+    xQueueReset(conn->cmd_queue);
+    if (err != 0)
+    {
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", strerror(err));
+    }
+    else
+    {
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send or receive");
+    }
 }
 
-// Process the incoming command for conn
+static bool comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
+{
+    ssize_t sent = send(conn->sock, data, len, 0);
+    if (sent == -1)
+    {
+        comms_drop_connection(conn, errno);
+        return false;
+    }
+    else if (sent < len)
+    {
+        comms_drop_connection(conn, 0);
+        return false;
+    }
+
+    return true;
+}
+
+static bool comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
+{
+    ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
+    if (rlen == -1)
+    {
+        comms_drop_connection(conn, errno);
+        return false;
+    }
+    else if (rlen < len)
+    {
+        comms_drop_connection(conn, 0);
+        return false;
+    }
+
+    return true;
+}
+
+// Process the incoming command for conn, returning true
 // It is assumed that conn->sock has been polled and is ready to read
 // If an error occurs, conn will be dropped and false will be returned
 static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 {
     // Receive command code
     int rlen = recv(conn->sock, rx_buf, 1, MSG_WAITALL);
-    if (rlen != 1)
-    {
-        comms_drop_connection(conn, errno);
-        return false;
-    }
+    if (comms_recv(conn, rx_buf, 1) == false) return false;
 
     // Process
+    bool success = true;
     uint8_t cmd_code = rx_buf[0];
     switch (cmd_code)
     {
+        case CMD_HEARTBEAT_REQUEST:
+        {
+            comms_cmd_t cmd =
+            {
+                .cmd_code = CMD_HEARTBEAT_RESPONSE,
+                .data_len = 0,
+                .data = NULL,
+            };
 
+            xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+        }
+        break;
+
+        case CMD_HEARTBEAT_RESPONSE:
+        {
+            comms_cmd_t cmd =
+            {
+                .cmd_code = CMD_HEARTBEAT_REQUEST,
+                .data_len = 0,
+                .data = NULL,
+            };
+
+            xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+            conn->ping_timer = comms_get_time_ms();
+        }
+        break;
     }
 
-    return true;
+    return success;
 }
 
-// Process the next outgoing command for conn, if one is available
+// Process the next outgoing command for conn, if one is available, returning true
 // If an error occurs, conn will be dropped and false will be returned
 static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
 {
     comms_cmd_t cmd;
-    if (xQueueReceive(conn->cmd_queue, &cmd, 0) == pdFALSE)
-    {
-        return true;    // Nothing to process
-    }
+    if (xQueueReceive(conn->cmd_queue, &cmd, 0) == pdFALSE) return true; // Nothing to process
 
     // Process
+    bool success = true;
+    switch (cmd.cmd_code)
+    {
+        case CMD_HEARTBEAT_REQUEST:
+        {   
+            success = comms_send(conn, &cmd.cmd_code, 1);
+            if (success == false) break;
+
+            conn->ping_timer = comms_get_time_ms();
+        }
+        break;
+
+        case CMD_HEARTBEAT_RESPONSE:
+        {
+            success = comms_send(conn, &cmd.cmd_code, 1);
+        }
+        break;
+    }
 
     // Cleanup
     if (cmd.data_len > 0)
@@ -59,7 +138,7 @@ static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
         free(cmd.data);
     }
     
-    return true;
+    return success;
 }
 
 // TCP server thread
@@ -158,6 +237,7 @@ static void tcp_server_task(void *pvParameters)
                             {
                                 memcpy(new_conn->name, tcp_server.rx_buf, name_len);
                                 new_conn->open = true;
+                                new_conn->ping_timer = comms_get_time_ms();
                                 tcp_server.num_conns += 1;
                                 ESP_LOGI(TAG_COMMS, "[server] New client: %s", new_conn->name);
                             }    
@@ -202,7 +282,34 @@ static void tcp_server_task(void *pvParameters)
         }
 
         // 3) SEND PENDING COMMANDS TO CLIENTS
+        for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
+        {
+            tcp_conn_t *conn = &tcp_server.conns[i];
+            if (conn->open == true)
+            {
+                if (comms_cmd_process_outgoing(conn) == false)
+                {
+                    tcp_server.num_conns -= 1;
+                }
+            }
+        }
 
+        // 4) DROP ANY CLIENTS THAT DID NOT RESPOND TO HEARTBEATS
+        int64_t time = comms_get_time_ms();
+        for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
+        {
+            tcp_conn_t *conn = &tcp_server.conns[i];
+            if (conn->open == true)
+            {
+                if (time - conn->ping_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
+                {
+                    close(conn->sock);
+                    conn->open = false;
+                    xQueueReset(conn->cmd_queue);
+                    ESP_LOGW(TAG_COMMS, "[server] Dropped %s as it did not respond to heartbeat within %dms", conn->name, COMMS_HEARTBEAT_TIMEOUT_MS);
+                }
+            }
+        }
 
         vTaskDelay(1);
     }
@@ -257,6 +364,7 @@ static void tcp_client_task(void *pvParameters)
         }
 
         tcp_client.server.open = true;
+        tcp_client.server.ping_timer = comms_get_time_ms();
         ESP_LOGI(TAG_COMMS, "[client] Connected to %s", tcp_client.server.name);
 
         // Send node name
@@ -271,6 +379,39 @@ static void tcp_client_task(void *pvParameters)
         // Client loop
         while (1)
         {
+            // 1) RECEIVE COMMANDS FROM SERVER
+
+            // Poll server for available data
+            struct pollfd server_poll = 
+            {
+                .fd = tcp_client.server.sock,
+                .events = POLLIN,
+                .revents = 0,
+            };
+
+            poll(&server_poll, 1, 0);
+
+            // Receive data if available
+            if (server_poll.revents & POLLIN)
+            {
+                if (comms_cmd_process_incoming(&tcp_client.server, tcp_client.rx_buf) == false)
+                {
+                    break;  // Socket error, break out of loop
+                }
+            }
+
+            // 3) SEND PENDING COMMANDS TO SERVER
+            if (comms_cmd_process_outgoing(&tcp_client.server) == false)
+            {
+                break;
+            }
+
+            // 4) DROP SERVER CONNECTION IF IT DID NOT RESPOND TO HEARTBEAT
+            if (comms_get_time_ms() - tcp_client.server.ping_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
+            {   
+                ESP_LOGW(TAG_COMMS, "[client] Server did not respond to heartbeat within %dms", COMMS_HEARTBEAT_TIMEOUT_MS);
+                break;
+            }
 
             vTaskDelay(1);
         }
@@ -278,6 +419,7 @@ static void tcp_client_task(void *pvParameters)
         // Cleanup after exiting loop
         close(tcp_client.server.sock);
         tcp_client.server.open = false;
+        xQueueReset(tcp_client.server.cmd_queue);
         ESP_LOGW(TAG_COMMS, "[client] Connection with %s closed", tcp_client.server.name);
     }
 }
