@@ -66,7 +66,6 @@ static bool comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
 static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 {
     // Receive command code
-    int rlen = recv(conn->sock, rx_buf, 1, MSG_WAITALL);
     if (comms_recv(conn, rx_buf, 1) == false) return false;
 
     // Process
@@ -76,6 +75,7 @@ static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
     {
         case CMD_HEARTBEAT_REQUEST:
         {
+            ESP_LOGI(TAG_COMMS, "Got heartbeat request from %s", conn->name);
             comms_cmd_t cmd =
             {
                 .cmd_code = CMD_HEARTBEAT_RESPONSE,
@@ -89,15 +89,8 @@ static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 
         case CMD_HEARTBEAT_RESPONSE:
         {
-            comms_cmd_t cmd =
-            {
-                .cmd_code = CMD_HEARTBEAT_REQUEST,
-                .data_len = 0,
-                .data = NULL,
-            };
-
-            xQueueSendToBack(conn->cmd_queue, &cmd, 0);
-            conn->ping_timer = comms_get_time_ms();
+            ESP_LOGI(TAG_COMMS, "Got heartbeat response from %s", conn->name);
+            conn->heartbeat = true;
         }
         break;
     }
@@ -121,13 +114,15 @@ static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
             success = comms_send(conn, &cmd.cmd_code, 1);
             if (success == false) break;
 
-            conn->ping_timer = comms_get_time_ms();
+            ESP_LOGI(TAG_COMMS, "Sent heartbeat request to %s", conn->name);
+            conn->heartbeat = false;
         }
         break;
 
         case CMD_HEARTBEAT_RESPONSE:
         {
             success = comms_send(conn, &cmd.cmd_code, 1);
+            ESP_LOGI(TAG_COMMS, "Sent heartbeat response to %s", conn->name);
         }
         break;
     }
@@ -237,7 +232,7 @@ static void tcp_server_task(void *pvParameters)
                             {
                                 memcpy(new_conn->name, tcp_server.rx_buf, name_len);
                                 new_conn->open = true;
-                                new_conn->ping_timer = comms_get_time_ms();
+                                new_conn->heartbeat = true;     // Assumed alive for the next heartbeat timeout
                                 tcp_server.num_conns += 1;
                                 ESP_LOGI(TAG_COMMS, "[server] New client: %s", new_conn->name);
                             }    
@@ -293,23 +288,39 @@ static void tcp_server_task(void *pvParameters)
                 }
             }
         }
-
-        // 4) DROP ANY CLIENTS THAT DID NOT RESPOND TO HEARTBEATS
-        int64_t time = comms_get_time_ms();
-        for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
+        
+        // 4) DETECT DROPPED CONNECTIONS
+        if (comms_get_time_ms() - tcp_server.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
         {
-            tcp_conn_t *conn = &tcp_server.conns[i];
-            if (conn->open == true)
+            for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
             {
-                if (time - conn->ping_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
+                tcp_conn_t *conn = &tcp_server.conns[i];
+                if ((conn->open == true) && (conn->heartbeat == false))
                 {
+                    // No response to heartbeat, drop connection
                     close(conn->sock);
                     conn->open = false;
                     xQueueReset(conn->cmd_queue);
                     ESP_LOGW(TAG_COMMS, "[server] Dropped %s as it did not respond to heartbeat within %dms", conn->name, COMMS_HEARTBEAT_TIMEOUT_MS);
                 }
+                else if ((conn->open == true) && (conn->heartbeat == true))
+                {
+                    // Send next heartbeat
+                    comms_cmd_t cmd =
+                    {
+                        .cmd_code = CMD_HEARTBEAT_REQUEST,
+                        .data_len = 0,
+                        .data = NULL,
+                    };
+
+                    xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+                }
             }
+
+            // Reset timer
+            tcp_server.heartbeat_timer = comms_get_time_ms();
         }
+
 
         vTaskDelay(1);
     }
@@ -364,7 +375,7 @@ static void tcp_client_task(void *pvParameters)
         }
 
         tcp_client.server.open = true;
-        tcp_client.server.ping_timer = comms_get_time_ms();
+        tcp_client.server.heartbeat = true;     // Assumed alive for the next heartbeat timeout
         ESP_LOGI(TAG_COMMS, "[client] Connected to %s", tcp_client.server.name);
 
         // Send node name
@@ -407,10 +418,29 @@ static void tcp_client_task(void *pvParameters)
             }
 
             // 4) DROP SERVER CONNECTION IF IT DID NOT RESPOND TO HEARTBEAT
-            if (comms_get_time_ms() - tcp_client.server.ping_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
+            if (comms_get_time_ms() - tcp_client.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
             {   
-                ESP_LOGW(TAG_COMMS, "[client] Server did not respond to heartbeat within %dms", COMMS_HEARTBEAT_TIMEOUT_MS);
-                break;
+                if (tcp_client.server.heartbeat == false)
+                {
+                    // No response to heartbeat, drop connection
+                    ESP_LOGW(TAG_COMMS, "[client] Server did not respond to heartbeat within %dms", COMMS_HEARTBEAT_TIMEOUT_MS);
+                    break;
+                }
+                else
+                {
+                    // Send next heartbeat
+                    comms_cmd_t cmd =
+                    {
+                        .cmd_code = CMD_HEARTBEAT_REQUEST,
+                        .data_len = 0,
+                        .data = NULL,
+                    };
+
+                    xQueueSendToBack(tcp_client.server.cmd_queue, &cmd, 0);
+                }
+
+                // Reset timer
+                tcp_client.heartbeat_timer = comms_get_time_ms();
             }
 
             vTaskDelay(1);
@@ -431,6 +461,7 @@ static bool tcp_server_start()
     for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
     {
         tcp_server.conns[i].open = false;
+        tcp_server.conns[i].heartbeat = false;
         tcp_server.conns[i].cmd_queue = xQueueCreate(COMMS_QUEUE_LENGTH, sizeof(comms_cmd_t));
     }
     tcp_server.num_conns = 0;
@@ -486,6 +517,7 @@ static void tcp_client_start()
     // Initial client state
     strcpy(tcp_client.node_name, NODE_SSID);
     tcp_client.server.open = false;
+    tcp_client.server.heartbeat = false;
 
     // We are currently hardcoding each node's parent in the build config, so we already know the parent's name
     // A better implementation would be to have the server transmit its name to the client upon connection

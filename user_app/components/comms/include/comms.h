@@ -48,7 +48,7 @@ typedef struct
 {
     bool open;
     int sock;
-    int64_t ping_timer;
+    bool heartbeat;
     char name[64];
     QueueHandle_t cmd_queue;
 } tcp_conn_t;
@@ -59,6 +59,7 @@ typedef struct
 
     tcp_conn_t conns[TCP_SERVER_MAX_CONNS];
     int num_conns;
+    int64_t heartbeat_timer;
 
     uint8_t tx_buf[COMMS_BUFFER_SIZE];
     uint8_t rx_buf[COMMS_BUFFER_SIZE];
@@ -68,6 +69,7 @@ typedef struct
 {
     char node_name[64];
     tcp_conn_t server;
+    int64_t heartbeat_timer;
 
     uint8_t tx_buf[COMMS_BUFFER_SIZE];
     uint8_t rx_buf[COMMS_BUFFER_SIZE];
