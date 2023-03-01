@@ -16,13 +16,14 @@ static void comms_drop_connection(tcp_conn_t *conn, int err)
     close(conn->sock);
     conn->open = false;
     xQueueReset(conn->cmd_queue);
+
     if (err != 0)
     {
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", strerror(err));
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(err));
     }
     else
     {
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send or receive");
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send or receive", conn->name);
     }
 }
 
@@ -435,7 +436,6 @@ static void tcp_client_task(void *pvParameters)
                         .data_len = 0,
                         .data = NULL,
                     };
-
                     xQueueSendToBack(tcp_client.server.cmd_queue, &cmd, 0);
                 }
 
@@ -518,6 +518,7 @@ static void tcp_client_start()
     strcpy(tcp_client.node_name, NODE_SSID);
     tcp_client.server.open = false;
     tcp_client.server.heartbeat = false;
+    tcp_client.server.cmd_queue = xQueueCreate(COMMS_QUEUE_LENGTH, sizeof(comms_cmd_t));
 
     // We are currently hardcoding each node's parent in the build config, so we already know the parent's name
     // A better implementation would be to have the server transmit its name to the client upon connection

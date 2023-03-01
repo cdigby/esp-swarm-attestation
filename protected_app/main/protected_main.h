@@ -16,4 +16,4 @@
 #include "sa_build_config.h"
 #include "sa_network.h"
 
-static const char *TAG_KERNEL = "KERNEL LOG";
+static const char *TAG_PROTECTED = "PROTECTED APP LOG";

@@ -29,7 +29,7 @@
 #define COMMS_BUFFER_SIZE   256     // Size in bytes of tx and rx buffers for TCP client and server
 #define COMMS_QUEUE_LENGTH  32      // Number of commands that each connection can have queued for transmission
 
-#define COMMS_HEARTBEAT_TIMEOUT_MS   5000
+#define COMMS_HEARTBEAT_TIMEOUT_MS   10000
 
 #define TCP_SERVER_MAX_CONNS      10
 
