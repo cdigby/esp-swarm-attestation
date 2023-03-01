@@ -25,6 +25,8 @@
 #define CMD_HEARTBEAT_REQUEST       0x02
 #define CMD_HEARTBEAT_RESPONSE      0x03
 
+#define CMD_PRINT_MESSAGE           0x04
+
 #define COMMS_TCP_PORT      3333
 #define COMMS_BUFFER_SIZE   256     // Size in bytes of tx and rx buffers for TCP client and server
 #define COMMS_QUEUE_LENGTH  32      // Number of commands that each connection can have queued for transmission
@@ -78,3 +80,4 @@ typedef struct
 static const char *TAG_COMMS = "COMMS LOG";
 
 bool comms_start();
+void comms_broadcast(comms_cmd_t *cmd);

@@ -11,20 +11,22 @@ static int64_t comms_get_time_ms()
     return (int64_t)(((int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec) / 1000);
 }
 
-static void comms_drop_connection(tcp_conn_t *conn, int err)
+static void comms_drop_connection(tcp_conn_t *conn)
 {
     close(conn->sock);
     conn->open = false;
-    xQueueReset(conn->cmd_queue);
 
-    if (err != 0)
+    // Free any data pointers
+    comms_cmd_t cmd;
+    while (xQueueReceive(conn->cmd_queue, &cmd, 0) == pdTRUE)
     {
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(err));
+        if (cmd.data_len > 0)
+        {
+            free(cmd.data);
+        }
     }
-    else
-    {
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send or receive", conn->name);
-    }
+
+    xQueueReset(conn->cmd_queue);
 }
 
 static bool comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
@@ -32,12 +34,14 @@ static bool comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
     ssize_t sent = send(conn->sock, data, len, 0);
     if (sent == -1)
     {
-        comms_drop_connection(conn, errno);
+        comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
         return false;
     }
     else if (sent < len)
     {
-        comms_drop_connection(conn, 0);
+        comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
         return false;
     }
 
@@ -49,12 +53,14 @@ static bool comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
     ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
     if (rlen == -1)
     {
-        comms_drop_connection(conn, errno);
+        comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
         return false;
     }
     else if (rlen < len)
     {
-        comms_drop_connection(conn, 0);
+        comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
         return false;
     }
 
@@ -94,6 +100,16 @@ static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
             conn->heartbeat = true;
         }
         break;
+
+        case CMD_PRINT_MESSAGE:
+        {
+            if (comms_recv(conn, rx_buf, 1) == false) return false;
+            uint8_t msg_len = rx_buf[0];
+
+            if (comms_recv(conn, rx_buf, msg_len) == false) return false;
+            ESP_LOGI(TAG_COMMS, "Received message: \"%s\" from %s", rx_buf, conn->name);
+        }
+        break;
     }
 
     return success;
@@ -124,6 +140,19 @@ static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
         {
             success = comms_send(conn, &cmd.cmd_code, 1);
             ESP_LOGI(TAG_COMMS, "Sent heartbeat response to %s", conn->name);
+        }
+        break;
+
+        case CMD_PRINT_MESSAGE:
+        {
+            success = comms_send(conn, &cmd.cmd_code, 1);
+            if (success == false) break;
+
+            success = comms_send(conn, &cmd.data_len, 1);
+            if (success == false) break;
+
+            success = comms_send(conn, cmd.data, cmd.data_len);
+            ESP_LOGI(TAG_COMMS, "Sent message \"%s\" to %s", cmd.data, conn->name);
         }
         break;
     }
@@ -299,9 +328,7 @@ static void tcp_server_task(void *pvParameters)
                 if ((conn->open == true) && (conn->heartbeat == false))
                 {
                     // No response to heartbeat, drop connection
-                    close(conn->sock);
-                    conn->open = false;
-                    xQueueReset(conn->cmd_queue);
+                    comms_drop_connection(conn);
                     ESP_LOGW(TAG_COMMS, "[server] Dropped %s as it did not respond to heartbeat within %dms", conn->name, COMMS_HEARTBEAT_TIMEOUT_MS);
                 }
                 else if ((conn->open == true) && (conn->heartbeat == true))
@@ -447,9 +474,7 @@ static void tcp_client_task(void *pvParameters)
         }
 
         // Cleanup after exiting loop
-        close(tcp_client.server.sock);
-        tcp_client.server.open = false;
-        xQueueReset(tcp_client.server.cmd_queue);
+        comms_drop_connection(&tcp_client.server);
         ESP_LOGW(TAG_COMMS, "[client] Connection with %s closed", tcp_client.server.name);
     }
 }
@@ -528,6 +553,22 @@ static void tcp_client_start()
     xTaskCreate(tcp_client_task, "tcp_client", 2048, NULL, 10, NULL);
 }
 
+static void comms_clone_cmd(comms_cmd_t *dest, comms_cmd_t *src)
+{
+    dest->cmd_code = src->cmd_code;
+    dest->data_len = src->data_len;
+
+    if (src->data_len > 0)
+    {
+        dest->data = malloc(src->data_len);
+        memcpy(dest->data, src->data, src->data_len);
+    }
+    else
+    {
+        dest->data = NULL;
+    }
+}
+
 // Start TCP server and client for comms
 bool comms_start()
 {
@@ -540,4 +581,37 @@ bool comms_start()
     
     tcp_client_start();
     return true;
+}
+
+// Broadcast a command to all connections
+// Data pointer is freed before returning
+void comms_broadcast(comms_cmd_t *cmd)
+{
+    // cmd may contain a pointer to additional data. This must not be freed until all instances of the command have been sent.
+    // To reduce complexity, I am getting around this by making multiple copies of the data, although this is very inefficient.
+    comms_cmd_t clone;
+
+    // If client is connected to server, send to server
+    if (tcp_client.server.open == true)
+    {
+        comms_clone_cmd(&clone, cmd);
+        xQueueSendToBack(tcp_client.server.cmd_queue, &clone, 0);
+    }
+
+    // Send to any clients connected to the server
+    for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
+    {
+        tcp_conn_t *conn = &tcp_server.conns[i];
+        if (conn->open == true)
+        {
+            comms_clone_cmd(&clone, cmd);
+            xQueueSendToBack(conn->cmd_queue, &clone, 0);
+        }
+    }
+
+    // Since we made copies of the command, free the original command's data pointer
+    if (cmd->data_len > 0)
+    {
+        free(cmd->data);
+    }
 }
