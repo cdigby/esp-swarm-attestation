@@ -1,1 +1,7 @@
-100 common sa_network_get_gateway_ip sys_sa_network_get_gateway_ip
+# Networking
+100  common  esp_netif_create_default_wifi_ap       sys_esp_netif_create_default_wifi_ap
+101  common  esp_netif_get_ip_info                  sys_esp_netif_get_ip_info
+102  common  esp_netif_set_ip_info                  sys_esp_netif_get_ip_info
+103  common  esp_netif_dhcps_stop                   sys_esp_netif_dhcps_stop
+104  common  esp_netif_dhcps_start                  sys_esp_netif_dhcps_start
+105  common  wifi_init_config_default               sys_wifi_init_config_default

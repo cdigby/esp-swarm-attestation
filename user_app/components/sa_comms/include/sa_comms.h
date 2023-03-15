@@ -19,7 +19,7 @@
 #include "esp_err.h"
 
 #include "sa_build_config.h"
-#include "sa_syscall.h"
+#include "sa_network.h"
 
 #define CMD_NODE_NAME               0x01    // Transmit the node's name
 #define CMD_HEARTBEAT_REQUEST       0x02
@@ -42,7 +42,7 @@
 typedef struct
 {
     uint8_t cmd_code;   // Command code
-    size_t data_len;    // If > 0, data points to extra data that must be freed after processing
+    uint8_t data_len;   // If > 0, data points to extra data that must be freed after processing
     uint8_t *data;
 } comms_cmd_t;
 
@@ -79,5 +79,5 @@ typedef struct
 
 static const char *TAG_COMMS = "COMMS LOG";
 
-bool comms_start();
-void comms_broadcast(comms_cmd_t *cmd);
+bool sa_comms_init();
+void sa_comms_broadcast(comms_cmd_t *cmd);

@@ -3,6 +3,7 @@ if(USER_APP_BUILD)
     idf_component_register(
         SRCS "sa_wrappers.c"
         INCLUDE_DIRS "include"
+        REQUIRES esp_netif
     )
 else()
     # Component settings when building for protected app
@@ -10,7 +11,7 @@ else()
     idf_component_register(
         SRCS "sa_syscalls.c"
         INCLUDE_DIRS "include"
-        REQUIRES sa_network
+        REQUIRES esp_netif esp_wifi
     )
 endif()
 

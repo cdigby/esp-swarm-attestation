@@ -20,8 +20,6 @@ void app_main()
 
     // esp_priv_access_set_periph_perm(PA_GPIO, PA_WORLD_1, PA_PERM_ALL);
 
-    // Initialise network, start wifi access point
-    sa_network_init();
 
     // Boot user app
     ret = esp_priv_access_user_boot();

@@ -126,8 +126,10 @@ void sa_network_init()
     // Create event loop, register event handlers
     // Event handlers get a pointer to the network state when they are called
     esp_event_loop_create_default();
-    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
-    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL, NULL);
+    esp_event_handler_instance_t wifi_event_context;
+    esp_event_handler_instance_t ip_event_context;
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &wifi_event_context);
+    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL, &ip_event_context);
 
     // Create default net interfaces
     esp_netif_init();
@@ -152,8 +154,12 @@ void sa_network_init()
     ESP_LOGI(TAG_NETWORK, "ap ip: " IPSTR ", mask: " IPSTR ", gw: " IPSTR, IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask), IP2STR(&ip_info.gw));
     
     // Configure and start wifi
-    wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&wifi_cfg);
+    // wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
+
+    wifi_init_config_t wifi_init_cfg;
+    wifi_init_config_default(&wifi_init_cfg);
+    esp_wifi_init(&wifi_init_cfg);
+
     esp_wifi_set_mode(WIFI_MODE_APSTA);
     wifi_config_t ap_cfg =
     {

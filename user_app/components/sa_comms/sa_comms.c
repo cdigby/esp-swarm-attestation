@@ -1,17 +1,17 @@
-#include "comms.h"
+#include "sa_comms.h"
 
 static tcp_server_t tcp_server;
 static tcp_client_t tcp_client;
 
 // Get the current time in ms
-static int64_t comms_get_time_ms()
+static int64_t sa_comms_get_time_ms()
 {
     struct timeval tv_now;
     gettimeofday(&tv_now, NULL);
     return (int64_t)(((int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec) / 1000);
 }
 
-static void comms_drop_connection(tcp_conn_t *conn)
+static void sa_comms_drop_connection(tcp_conn_t *conn)
 {
     close(conn->sock);
     conn->open = false;
@@ -29,18 +29,18 @@ static void comms_drop_connection(tcp_conn_t *conn)
     xQueueReset(conn->cmd_queue);
 }
 
-static bool comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
+static bool sa_comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
 {
     ssize_t sent = send(conn->sock, data, len, 0);
     if (sent == -1)
     {
-        comms_drop_connection(conn);
+        sa_comms_drop_connection(conn);
         ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
         return false;
     }
     else if (sent < len)
     {
-        comms_drop_connection(conn);
+        sa_comms_drop_connection(conn);
         ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
         return false;
     }
@@ -48,18 +48,18 @@ static bool comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
     return true;
 }
 
-static bool comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
+static bool sa_comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
 {
     ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
     if (rlen == -1)
     {
-        comms_drop_connection(conn);
+        sa_comms_drop_connection(conn);
         ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
         return false;
     }
     else if (rlen < len)
     {
-        comms_drop_connection(conn);
+        sa_comms_drop_connection(conn);
         ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
         return false;
     }
@@ -70,10 +70,10 @@ static bool comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
 // Process the incoming command for conn, returning true
 // It is assumed that conn->sock has been polled and is ready to read
 // If an error occurs, conn will be dropped and false will be returned
-static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
+static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 {
     // Receive command code
-    if (comms_recv(conn, rx_buf, 1) == false) return false;
+    if (sa_comms_recv(conn, rx_buf, 1) == false) return false;
 
     // Process
     bool success = true;
@@ -103,10 +103,10 @@ static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 
         case CMD_PRINT_MESSAGE:
         {
-            if (comms_recv(conn, rx_buf, 1) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, 1) == false) return false;
             uint8_t msg_len = rx_buf[0];
 
-            if (comms_recv(conn, rx_buf, msg_len) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, msg_len) == false) return false;
             ESP_LOGI(TAG_COMMS, "Received message: \"%s\" from %s", rx_buf, conn->name);
         }
         break;
@@ -117,7 +117,7 @@ static bool comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 
 // Process the next outgoing command for conn, if one is available, returning true
 // If an error occurs, conn will be dropped and false will be returned
-static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
+static bool sa_comms_cmd_process_outgoing(tcp_conn_t *conn)
 {
     comms_cmd_t cmd;
     if (xQueueReceive(conn->cmd_queue, &cmd, 0) == pdFALSE) return true; // Nothing to process
@@ -128,7 +128,7 @@ static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
     {
         case CMD_HEARTBEAT_REQUEST:
         {   
-            success = comms_send(conn, &cmd.cmd_code, 1);
+            success = sa_comms_send(conn, &cmd.cmd_code, 1);
             if (success == false) break;
 
             ESP_LOGI(TAG_COMMS, "Sent heartbeat request to %s", conn->name);
@@ -138,20 +138,20 @@ static bool comms_cmd_process_outgoing(tcp_conn_t *conn)
 
         case CMD_HEARTBEAT_RESPONSE:
         {
-            success = comms_send(conn, &cmd.cmd_code, 1);
+            success = sa_comms_send(conn, &cmd.cmd_code, 1);
             ESP_LOGI(TAG_COMMS, "Sent heartbeat response to %s", conn->name);
         }
         break;
 
         case CMD_PRINT_MESSAGE:
         {
-            success = comms_send(conn, &cmd.cmd_code, 1);
+            success = sa_comms_send(conn, &cmd.cmd_code, 1);
             if (success == false) break;
 
-            success = comms_send(conn, &cmd.data_len, 1);
+            success = sa_comms_send(conn, &cmd.data_len, 1);
             if (success == false) break;
 
-            success = comms_send(conn, cmd.data, cmd.data_len);
+            success = sa_comms_send(conn, cmd.data, cmd.data_len);
             ESP_LOGI(TAG_COMMS, "Sent message \"%s\" to %s", cmd.data, conn->name);
         }
         break;
@@ -171,9 +171,6 @@ static void tcp_server_task(void *pvParameters)
 {
     int rlen = 0;
     ESP_LOGI(TAG_COMMS, "[server] Started TCP server task");
-
-    // Update ping timer
-    // tcp_server.ping_timer = comms_get_time_ms();
 
     // Socket options
     int opt_keep_alive = 1;                                 // Keep socket alive
@@ -299,7 +296,7 @@ static void tcp_server_task(void *pvParameters)
         {
             if (client_poll[i].revents & POLLIN)
             {
-                if (comms_cmd_process_incoming(open_conns[i], tcp_server.rx_buf) == false)
+                if (sa_comms_cmd_process_incoming(open_conns[i], tcp_server.rx_buf) == false)
                 {
                     tcp_server.num_conns -= 1;  // If there was an error, the conn was dropped so update num_conns
                 }
@@ -312,7 +309,7 @@ static void tcp_server_task(void *pvParameters)
             tcp_conn_t *conn = &tcp_server.conns[i];
             if (conn->open == true)
             {
-                if (comms_cmd_process_outgoing(conn) == false)
+                if (sa_comms_cmd_process_outgoing(conn) == false)
                 {
                     tcp_server.num_conns -= 1;
                 }
@@ -320,7 +317,7 @@ static void tcp_server_task(void *pvParameters)
         }
         
         // 4) DETECT DROPPED CONNECTIONS
-        if (comms_get_time_ms() - tcp_server.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
+        if (sa_comms_get_time_ms() - tcp_server.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
         {
             for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
             {
@@ -328,7 +325,7 @@ static void tcp_server_task(void *pvParameters)
                 if ((conn->open == true) && (conn->heartbeat == false))
                 {
                     // No response to heartbeat, drop connection
-                    comms_drop_connection(conn);
+                    sa_comms_drop_connection(conn);
                     ESP_LOGW(TAG_COMMS, "[server] Dropped %s as it did not respond to heartbeat within %dms", conn->name, COMMS_HEARTBEAT_TIMEOUT_MS);
                 }
                 else if ((conn->open == true) && (conn->heartbeat == true))
@@ -346,7 +343,7 @@ static void tcp_server_task(void *pvParameters)
             }
 
             // Reset timer
-            tcp_server.heartbeat_timer = comms_get_time_ms();
+            tcp_server.heartbeat_timer = sa_comms_get_time_ms();
         }
 
 
@@ -369,7 +366,7 @@ static void tcp_client_task(void *pvParameters)
 
         // Use our syscall to retrieve the gateway ip
         uint32_t gw_ip = 0;
-        if (usr_sa_network_get_gateway_ip(&gw_ip) == -1)
+        if (sa_network_get_gateway_ip(&gw_ip) == -1)
         {
             continue;   // Abort
         }
@@ -433,20 +430,20 @@ static void tcp_client_task(void *pvParameters)
             // Receive data if available
             if (server_poll.revents & POLLIN)
             {
-                if (comms_cmd_process_incoming(&tcp_client.server, tcp_client.rx_buf) == false)
+                if (sa_comms_cmd_process_incoming(&tcp_client.server, tcp_client.rx_buf) == false)
                 {
                     break;  // Socket error, break out of loop
                 }
             }
 
             // 3) SEND PENDING COMMANDS TO SERVER
-            if (comms_cmd_process_outgoing(&tcp_client.server) == false)
+            if (sa_comms_cmd_process_outgoing(&tcp_client.server) == false)
             {
                 break;
             }
 
             // 4) DROP SERVER CONNECTION IF IT DID NOT RESPOND TO HEARTBEAT
-            if (comms_get_time_ms() - tcp_client.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
+            if (sa_comms_get_time_ms() - tcp_client.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
             {   
                 if (tcp_client.server.heartbeat == false)
                 {
@@ -467,14 +464,14 @@ static void tcp_client_task(void *pvParameters)
                 }
 
                 // Reset timer
-                tcp_client.heartbeat_timer = comms_get_time_ms();
+                tcp_client.heartbeat_timer = sa_comms_get_time_ms();
             }
 
             vTaskDelay(1);
         }
 
         // Cleanup after exiting loop
-        comms_drop_connection(&tcp_client.server);
+        sa_comms_drop_connection(&tcp_client.server);
         ESP_LOGW(TAG_COMMS, "[client] Connection with %s closed", tcp_client.server.name);
     }
 }
@@ -553,7 +550,7 @@ static void tcp_client_start()
     xTaskCreate(tcp_client_task, "tcp_client", 2048, NULL, 10, NULL);
 }
 
-static void comms_clone_cmd(comms_cmd_t *dest, comms_cmd_t *src)
+static void sa_comms_clone_cmd(comms_cmd_t *dest, comms_cmd_t *src)
 {
     dest->cmd_code = src->cmd_code;
     dest->data_len = src->data_len;
@@ -570,7 +567,7 @@ static void comms_clone_cmd(comms_cmd_t *dest, comms_cmd_t *src)
 }
 
 // Start TCP server and client for comms
-bool comms_start()
+bool sa_comms_init()
 {
     // Server start can fail (client start can't)
     // Return early if server start fails
@@ -585,7 +582,7 @@ bool comms_start()
 
 // Broadcast a command to all connections
 // Data pointer is freed before returning
-void comms_broadcast(comms_cmd_t *cmd)
+void sa_comms_broadcast(comms_cmd_t *cmd)
 {
     // cmd may contain a pointer to additional data. This must not be freed until all instances of the command have been sent.
     // To reduce complexity, I am getting around this by making multiple copies of the data, although this is very inefficient.
@@ -594,7 +591,7 @@ void comms_broadcast(comms_cmd_t *cmd)
     // If client is connected to server, send to server
     if (tcp_client.server.open == true)
     {
-        comms_clone_cmd(&clone, cmd);
+        sa_comms_clone_cmd(&clone, cmd);
         xQueueSendToBack(tcp_client.server.cmd_queue, &clone, 0);
     }
 
@@ -604,7 +601,7 @@ void comms_broadcast(comms_cmd_t *cmd)
         tcp_conn_t *conn = &tcp_server.conns[i];
         if (conn->open == true)
         {
-            comms_clone_cmd(&clone, cmd);
+            sa_comms_clone_cmd(&clone, cmd);
             xQueueSendToBack(conn->cmd_queue, &clone, 0);
         }
     }

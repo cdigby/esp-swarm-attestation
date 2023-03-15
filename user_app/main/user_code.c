@@ -6,8 +6,11 @@ void user_main()
 {
     ESP_LOGI(TAG_USER, "Userspace start");
 
+    // Initialise network, start wifi access point
+    sa_network_init();
+
     // Wifi is initialised before user app boot, so we can start comms immediately
-    comms_start();
+    sa_comms_init();
 
     while (1)
     {
@@ -19,7 +22,7 @@ void user_main()
         cmd.data = malloc(cmd.data_len);
         strcpy((char*)cmd.data, TEST_MSG);
 
-        comms_broadcast(&cmd);
+        sa_comms_broadcast(&cmd);
 
         vTaskDelay(10000);
     }
