@@ -102,20 +102,14 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t eve
     }
 }
 
-// If connected to parent, return 0 and store the parent's gateway ip in result
-// If not connected, return -1
-int sa_network_get_gateway_ip(uint32_t *result)
+// Return the gateway ip of the parent node
+// If not connected, 0 will be returned
+uint32_t sa_network_get_gateway_ip()
 {
     esp_netif_ip_info_t ip_info;
     esp_netif_get_ip_info(sta_netif, &ip_info);
 
-    if (ip_info.gw.addr != 0)
-    {
-        *result = ip_info.gw.addr;
-        return 0;
-    }
-    
-    return -1;
+    return ip_info.gw.addr;
 }
 
 void sa_network_init()

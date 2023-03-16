@@ -364,11 +364,11 @@ static void tcp_client_task(void *pvParameters)
         // Delay before attempting connection again
         vTaskDelay(1000);
 
-        // Use our syscall to retrieve the gateway ip
-        uint32_t gw_ip = 0;
-        if (sa_network_get_gateway_ip(&gw_ip) == -1)
+        // Get the gateway ip
+        uint32_t gw_ip = sa_network_get_gateway_ip();
+        if (gw_ip == 0)
         {
-            continue;   // Abort
+            continue;   // Not connected, abort
         }
 
         // Create socket
