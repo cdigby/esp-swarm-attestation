@@ -73,35 +73,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
     }
 }
 
-static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-{
-    if (event_base != IP_EVENT)
-    {
-        return;
-    }
-
-    switch (event_id)
-    {
-        case IP_EVENT_STA_GOT_IP:
-        {
-            
-        }
-        break;
-
-        case IP_EVENT_STA_LOST_IP:
-        {
-            
-        }
-        break;
-
-        case IP_EVENT_AP_STAIPASSIGNED:
-        {
-
-        }
-        break;
-    }
-}
-
 // Return the gateway ip of the parent node
 // If not connected, 0 will be returned
 uint32_t sa_network_get_gateway_ip()
@@ -120,10 +91,9 @@ void sa_network_init()
     // Create event loop, register event handlers
     // Event handlers get a pointer to the network state when they are called
     esp_event_loop_create_default();
-    esp_event_handler_instance_t wifi_event_context;
-    esp_event_handler_instance_t ip_event_context;
+
+    esp_event_handler_instance_t wifi_event_context;    // Even though we never use this, the syscall version of esp_event_handler_instance_register() will not accept NULL
     esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &wifi_event_context);
-    esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL, &ip_event_context);
 
     // Create default net interfaces
     esp_netif_init();
@@ -148,8 +118,6 @@ void sa_network_init()
     ESP_LOGI(TAG_NETWORK, "ap ip: " IPSTR ", mask: " IPSTR ", gw: " IPSTR, IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask), IP2STR(&ip_info.gw));
     
     // Configure and start wifi
-    // wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
-
     wifi_init_config_t wifi_init_cfg;
     wifi_init_config_default(&wifi_init_cfg);
     esp_wifi_init(&wifi_init_cfg);
