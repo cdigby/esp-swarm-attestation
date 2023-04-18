@@ -8,8 +8,5 @@
 
 #include "Hacl_HMAC.h"
 
-
-static const char *TAG_ATTEST = "ATTEST LOG";
-
 void init_fake_app_memory();
 void compute_software_state(uint8_t *key, size_t key_len, uint8_t out[32]);
