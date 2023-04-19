@@ -5,6 +5,7 @@
 #include "esp_attr.h"
 
 #include "sa_shared.h"
+#include "sa_protected_comms.h"
 
 #define SIMPLE_KEY_SIZE     32
 #define SIMPLE_HMAC_LEN     32
@@ -39,3 +40,5 @@
 #define SIMPLE_HMAC_DATA_VALUE_OFFSET  0
 #define SIMPLE_HMAC_DATA_CP_OFFSET    (SIMPLE_HMAC_DATA_VALUE_OFFSET + SIMPLE_HMAC_DATA_VALUE_LEN)
 #define SIMPLE_HMAC_DATA_NONCE_OFFSET (SIMPLE_HMAC_DATA_CP_OFFSET + SIMPLE_HMAC_DATA_CP_LEN)
+
+void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock);

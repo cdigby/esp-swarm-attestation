@@ -14,5 +14,6 @@
 
 #include "sa_network.h"
 #include "sa_comms.h"
+#include "sa_syscall.h"
 
 static const char *TAG_USER = "USERSPACE LOG";

@@ -72,3 +72,11 @@ void sys_wifi_init_config_default(wifi_init_config_t *cfg)
     wifi_init_config_t new = WIFI_INIT_CONFIG_DEFAULT();
     memcpy(cfg, &new, sizeof(wifi_init_config_t));
 }
+
+// We will link against the sa_algorithms component library, but can't easily include the headers,
+// so forward declare the functions we need as extern
+extern void simple_prover(uint8_t msg[68], uint8_t h[32], int response_sock);
+void sys_simple_prover(uint8_t msg[68], uint8_t h[32], int response_sock)
+{
+    simple_prover(msg, h, response_sock);
+}

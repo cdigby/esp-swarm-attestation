@@ -45,3 +45,8 @@ void usr_wifi_init_config_default(wifi_init_config_t *cfg)
 {
     EXECUTE_SYSCALL(__NR_wifi_init_config_default);
 }
+
+void usr_simple_prover(uint8_t msg[68], uint8_t h[32], int response_sock)
+{
+    EXECUTE_SYSCALL(msg, h, response_sock, __NR_simple_prover);
+}

@@ -19,5 +19,8 @@ if(USER_APP_BUILD)
 else()
     idf_component_get_property(esp_syscall_lib esp_syscall COMPONENT_LIB)
     target_link_libraries(${COMPONENT_LIB} PUBLIC ${esp_syscall_lib})
+
+    idf_component_get_property(sa_algorithms_lib sa_algorithms COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC ${sa_algorithms_lib})
 endif()
 

@@ -4,13 +4,6 @@
 
 #include "esp_wifi.h"
 
-// typedef struct
-// {
-//     c;  //counter
-//     vs; //valids state
-//     nonce;  //nonce
-// } simple_msg_t;
-
 void wifi_init_config_default(wifi_init_config_t *cfg);
 
-// void execute_simple(simple_msg_t msg, h, int sender);
+void simple_prover(uint8_t msg[68], uint8_t h[32], int response_sock);

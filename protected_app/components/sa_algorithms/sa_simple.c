@@ -16,8 +16,9 @@ static DRAM_ATTR uint8_t k_attest[SIMPLE_KEY_SIZE] =    // Attestation key
 
 static DRAM_ATTR uint32_t cp = 0;             // Prover counter
 
-void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN])
+void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock)
 {
+    printf("called simple_prover\n");
     // Parse msg
     uint32_t cv =
         (uint32_t)msg[SIMPLE_MSG_CV_OFFSET] |
@@ -67,6 +68,10 @@ void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN])
                 report_hmac_data_buf[SIMPLE_HMAC_DATA_VALUE_OFFSET] = 0;
                 Hacl_HMAC_compute_sha2_256(report + SIMPLE_REPORT_HMAC_OFFSET, k_auth, SIMPLE_KEY_SIZE, report_hmac_data_buf, SIMPLE_HMAC_DATA_LEN);
             }
+
+            // Send report
+            printf("reached send\n");
+            sa_protected_send(response_sock, report, SIMPLE_REPORT_LEN);
         }
     }
 }
