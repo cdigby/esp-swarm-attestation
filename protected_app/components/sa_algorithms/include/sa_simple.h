@@ -4,20 +4,13 @@
 
 #include "esp_attr.h"
 
+#include "sa_shared_defs.h"
+
 #include "sa_shared.h"
 #include "sa_protected_comms.h"
 
-#define SIMPLE_KEY_SIZE     32
-#define SIMPLE_HMAC_LEN     32
 
-// Structure of SIMPLE message
-// Since we are reading this from a uint8_t array sent over the network by a python script, it is simpler
-// to use byte offsets rather than a struct
-#define SIMPLE_MSG_CV_LEN           4
-#define SIMPLE_MSG_VS_LEN           32
-#define SIMPLE_MSG_NONCE_LEN        32
-#define SIMPLE_MSG_LEN              (SIMPLE_MSG_CV_LEN + SIMPLE_MSG_VS_LEN + SIMPLE_MSG_NONCE_LEN)  
-
+// Offsets for SIMPLE message
 #define SIMPLE_MSG_CV_OFFSET        0
 #define SIMPLE_MSG_VS_OFFSET        (SIMPLE_MSG_CV_OFFSET + SIMPLE_MSG_CV_LEN)
 #define SIMPLE_MSG_NONCE_OFFSET     (SIMPLE_MSG_VS_OFFSET + SIMPLE_MSG_VS_LEN)

@@ -19,13 +19,16 @@
 #include "esp_err.h"
 
 #include "sa_build_config.h"
+#include "sa_shared_defs.h"
 #include "sa_network.h"
+#include "sa_syscall.h"
 
 #define CMD_NODE_NAME               0x01    // Transmit the node's name
 #define CMD_HEARTBEAT_REQUEST       0x02
 #define CMD_HEARTBEAT_RESPONSE      0x03
-
 #define CMD_PRINT_MESSAGE           0x04
+#define CMD_SIMPLE_ATTEST           0x05
+#define CMD_CLOSE_CONN              0x06
 
 #define COMMS_TCP_PORT      3333
 #define COMMS_BUFFER_SIZE   256     // Size in bytes of tx and rx buffers for TCP client and server

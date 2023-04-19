@@ -110,6 +110,28 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
             ESP_LOGI(TAG_COMMS, "Received message: \"%s\" from %s", rx_buf, conn->name);
         }
         break;
+
+        case CMD_SIMPLE_ATTEST:
+        {
+            if (sa_comms_recv(conn, rx_buf, SIMPLE_MSG_LEN + SIMPLE_HMAC_LEN) == false) return false;
+            ESP_LOGI(TAG_COMMS, "Received SIMPLE attestation request from %s", conn->name);
+
+            // Make syscall - execute algorithm in protected space
+            uint8_t msg[SIMPLE_MSG_LEN];
+            uint8_t h[SIMPLE_HMAC_LEN];
+            memcpy(msg, rx_buf, SIMPLE_MSG_LEN);
+            memcpy(h, rx_buf + SIMPLE_MSG_LEN, SIMPLE_HMAC_LEN);
+            simple_prover(msg, h, conn->sock);
+            ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
+        }
+        break;
+
+        case CMD_CLOSE_CONN:
+        {
+            sa_comms_drop_connection(conn);
+            ESP_LOGI(TAG_COMMS, "Connection with %s closed gracefully", conn->name);
+        }
+        break;
     }
 
     return success;

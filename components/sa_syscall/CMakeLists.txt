@@ -10,7 +10,7 @@ idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS include
     PRIV_INCLUDE_DIRS .
-    REQUIRES syscall_shared esp_priv_build_utils esp_netif esp_wifi
+    REQUIRES syscall_shared esp_priv_build_utils esp_netif esp_wifi sa_config
 )
 
 if(USER_APP_BUILD)

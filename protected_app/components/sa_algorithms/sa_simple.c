@@ -18,7 +18,6 @@ static DRAM_ATTR uint32_t cp = 0;             // Prover counter
 
 void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock)
 {
-    printf("called simple_prover\n");
     // Parse msg
     uint32_t cv =
         (uint32_t)msg[SIMPLE_MSG_CV_OFFSET] |
@@ -70,7 +69,6 @@ void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int 
             }
 
             // Send report
-            printf("reached send\n");
             sa_protected_send(response_sock, report, SIMPLE_REPORT_LEN);
         }
     }
