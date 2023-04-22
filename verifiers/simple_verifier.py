@@ -24,7 +24,8 @@ CMD_CLOSE_CONN    = 0x06.to_bytes(1, byteorder="little")
 
 # Fake memory region considered the valid state for the prover
 # Prover considered valid if all values in the region are 0
-FAKE_MEMORY_REGION = bytes(1024)
+FAKE_MEMORY_REGION = b'\x00' * 1024         # VALID
+# FAKE_MEMORY_REGION = b'\x01' * 1024       # INVALID
 
 # Get node id from CLI args
 if len(sys.argv) != 2:
