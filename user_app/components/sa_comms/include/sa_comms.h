@@ -9,7 +9,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "freertos/semphr.h"
 
 #include "lwip/err.h"
 #include "lwip/sockets.h"
@@ -53,10 +52,10 @@ typedef struct
 {
     bool open;
     int sock;
+    int sock_mutex;
     bool heartbeat;
     char name[64];
     QueueHandle_t cmd_queue;
-    SemaphoreHandle_t sock_mutex;
 } tcp_conn_t;
 
 typedef struct

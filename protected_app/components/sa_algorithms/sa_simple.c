@@ -16,7 +16,7 @@ static DRAM_ATTR uint8_t k_attest[SIMPLE_KEY_SIZE] =    // Attestation key
 
 static DRAM_ATTR uint32_t cp = 0;             // Prover counter
 
-void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, SemaphoreHandle_t response_sock_mutex)
+void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, int response_sock_mutex)
 {
     // Parse msg
     uint32_t cv =
@@ -69,7 +69,7 @@ void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int 
             }
 
             // Send report
-            sa_protected_send(response_sock, report, SIMPLE_REPORT_LEN, response_sock_mutex);
+            sa_protected_send(response_sock, response_sock_mutex, report, SIMPLE_REPORT_LEN);
         }
     }
 }

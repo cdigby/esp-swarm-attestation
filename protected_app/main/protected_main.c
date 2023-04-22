@@ -21,6 +21,9 @@ void app_main()
     // Initialise fake app memory for attestation algorithms
     init_fake_app_memory();
 
+    // Initialisation for protected comms
+    sa_protected_comms_init();
+
     // Initialise network, start wifi access point
     sa_network_init();
 

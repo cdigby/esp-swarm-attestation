@@ -31,25 +31,25 @@ static void sa_comms_drop_connection(tcp_conn_t *conn)
 
 static bool sa_comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
 {
-    if (xSemaphoreTake(conn->sock_mutex, portMAX_DELAY) == pdTRUE)
+    if (sa_protected_mutex_lock(conn->sock_mutex) == true)
     {
         ssize_t sent = send(conn->sock, data, len, 0);
         if (sent == -1)
         {
             sa_comms_drop_connection(conn);
             ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
-            xSemaphoreGive(conn->sock_mutex);
+            sa_protected_mutex_unlock(conn->sock_mutex);
             return false;
         }
         else if (sent < len)
         {
             sa_comms_drop_connection(conn);
             ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
-            xSemaphoreGive(conn->sock_mutex);
+            sa_protected_mutex_unlock(conn->sock_mutex);
             return false;
         }
 
-        xSemaphoreGive(conn->sock_mutex);
+        sa_protected_mutex_unlock(conn->sock_mutex);
         return true;
     }
     else
@@ -61,25 +61,25 @@ static bool sa_comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
 
 static bool sa_comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
 {
-    if (xSemaphoreTake(conn->sock_mutex, portMAX_DELAY) == pdTRUE)
+    if (sa_protected_mutex_lock(conn->sock_mutex) == true)
     {
         ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
         if (rlen == -1)
         {
             sa_comms_drop_connection(conn);
             ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
-            xSemaphoreGive(conn->sock_mutex);
+            sa_protected_mutex_unlock(conn->sock_mutex);
             return false;
         }
         else if (rlen < len)
         {
             sa_comms_drop_connection(conn);
             ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
-            xSemaphoreGive(conn->sock_mutex);
+            sa_protected_mutex_unlock(conn->sock_mutex);
             return false;
         }
 
-        xSemaphoreGive(conn->sock_mutex);
+        sa_protected_mutex_unlock(conn->sock_mutex);
         return true;
     }
     else
@@ -340,6 +340,7 @@ static void tcp_server_task(void *pvParameters)
         {
             if (client_poll[i].revents & POLLIN)
             {
+                // printf("open conns: %d, i: %d\n", tcp_server.num_conns, i);
                 if (sa_comms_cmd_process_incoming(open_conns[i], tcp_server.rx_buf) == false)
                 {
                     tcp_server.num_conns -= 1;  // If there was an error, the conn was dropped so update num_conns
@@ -536,7 +537,7 @@ static bool tcp_server_start()
         tcp_server.conns[i].open = false;
         tcp_server.conns[i].heartbeat = false;
         tcp_server.conns[i].cmd_queue = xQueueCreate(COMMS_QUEUE_LENGTH, sizeof(comms_cmd_t));
-        tcp_server.conns[i].sock_mutex = xSemaphoreCreateMutex();
+        tcp_server.conns[i].sock_mutex = sa_protected_mutex_create();
     }
     tcp_server.num_conns = 0;
 
@@ -593,7 +594,7 @@ static void tcp_client_start()
     tcp_client.server.open = false;
     tcp_client.server.heartbeat = false;
     tcp_client.server.cmd_queue = xQueueCreate(COMMS_QUEUE_LENGTH, sizeof(comms_cmd_t));
-    tcp_client.server.sock_mutex = xSemaphoreCreateMutex();
+    tcp_client.server.sock_mutex = sa_protected_mutex_create();
 
     // We are currently hardcoding each node's parent in the build config, so we already know the parent's name
     // A better implementation would be to have the server transmit its name to the client upon connection

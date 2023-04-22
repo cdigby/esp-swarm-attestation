@@ -8,5 +8,11 @@
 
 106  common  sa_network_get_gateway_ip              sys_sa_network_get_gateway_ip
 
+# Mutexes
+110  common  sa_protected_mutex_create              sys_sa_protected_mutex_create
+111  common  sa_protected_mutex_destroy             sys_sa_protected_mutex_destroy
+112  common  sa_protected_mutex_lock                sys_sa_protected_mutex_lock
+113  common  sa_protected_mutex_unlock              sys_sa_protected_mutex_unlock
+
 # Attestation
-110  common  simple_prover                          sys_simple_prover
+120  common  simple_prover                          sys_simple_prover

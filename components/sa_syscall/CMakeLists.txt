@@ -23,7 +23,10 @@ else()
     idf_component_get_property(sa_algorithms_lib sa_algorithms COMPONENT_LIB)
     target_link_libraries(${COMPONENT_LIB} PUBLIC ${sa_algorithms_lib})
 
-    idf_component_get_property(sa_algorithms_lib sa_network COMPONENT_LIB)
-    target_link_libraries(${COMPONENT_LIB} PUBLIC ${sa_algorithms_lib})
+    idf_component_get_property(sa_network_lib sa_network COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC ${sa_network_lib})
+
+    idf_component_get_property(sa_protected_comms_lib sa_protected_comms COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC ${sa_protected_comms_lib})
 endif()
 
