@@ -152,6 +152,9 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
         {
             sa_comms_drop_connection(conn);
             ESP_LOGI(TAG_COMMS, "Connection with %s closed gracefully", conn->name);
+
+            // Need to return false so that caller knows connection was dropped.
+            return false;
         }
         break;
     }
@@ -340,7 +343,6 @@ static void tcp_server_task(void *pvParameters)
         {
             if (client_poll[i].revents & POLLIN)
             {
-                // printf("open conns: %d, i: %d\n", tcp_server.num_conns, i);
                 if (sa_comms_cmd_process_incoming(open_conns[i], tcp_server.rx_buf) == false)
                 {
                     tcp_server.num_conns -= 1;  // If there was an error, the conn was dropped so update num_conns
