@@ -14,7 +14,6 @@
 #include "esp_event.h"
 
 #include "sa_build_config.h"
-#include "sa_syscall.h"
 
 static const char *TAG_NETWORK = "NETWORK LOG";
 

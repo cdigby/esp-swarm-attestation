@@ -12,7 +12,6 @@
 
 #include "esp_log.h"
 
-#include "sa_network.h"
 #include "sa_comms.h"
 #include "sa_syscall.h"
 

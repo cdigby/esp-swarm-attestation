@@ -21,7 +21,6 @@
 
 #include "sa_build_config.h"
 #include "sa_shared_defs.h"
-#include "sa_network.h"
 #include "sa_syscall.h"
 
 #define CMD_NODE_NAME               0x01    // Transmit the node's name

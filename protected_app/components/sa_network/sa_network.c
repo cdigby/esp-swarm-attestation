@@ -118,8 +118,7 @@ void sa_network_init()
     ESP_LOGI(TAG_NETWORK, "ap ip: " IPSTR ", mask: " IPSTR ", gw: " IPSTR, IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask), IP2STR(&ip_info.gw));
     
     // Configure and start wifi
-    wifi_init_config_t wifi_init_cfg;
-    wifi_init_config_default(&wifi_init_cfg);
+    wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_init_cfg);
 
     esp_wifi_set_mode(WIFI_MODE_APSTA);

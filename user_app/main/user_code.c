@@ -6,9 +6,6 @@ void user_main()
 {
     ESP_LOGI(TAG_USER, "Userspace start");
 
-    // Initialise network, start wifi access point
-    sa_network_init();
-
     // Wifi is initialised before user app boot, so we can start comms immediately
     sa_comms_init();
 

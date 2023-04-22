@@ -21,6 +21,9 @@ void app_main()
     // Initialise fake app memory for attestation algorithms
     init_fake_app_memory();
 
+    // Initialise network, start wifi access point
+    sa_network_init();
+
     // Boot user app
     ret = esp_priv_access_user_boot();
     if (ret != ESP_OK)
