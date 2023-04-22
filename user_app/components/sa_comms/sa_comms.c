@@ -31,40 +31,62 @@ static void sa_comms_drop_connection(tcp_conn_t *conn)
 
 static bool sa_comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
 {
-    ssize_t sent = send(conn->sock, data, len, 0);
-    if (sent == -1)
+    if (xSemaphoreTake(conn->sock_mutex, portMAX_DELAY) == pdTRUE)
     {
-        sa_comms_drop_connection(conn);
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
-        return false;
-    }
-    else if (sent < len)
-    {
-        sa_comms_drop_connection(conn);
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
-        return false;
-    }
+        ssize_t sent = send(conn->sock, data, len, 0);
+        if (sent == -1)
+        {
+            sa_comms_drop_connection(conn);
+            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
+            xSemaphoreGive(conn->sock_mutex);
+            return false;
+        }
+        else if (sent < len)
+        {
+            sa_comms_drop_connection(conn);
+            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
+            xSemaphoreGive(conn->sock_mutex);
+            return false;
+        }
 
-    return true;
+        xSemaphoreGive(conn->sock_mutex);
+        return true;
+    }
+    else
+    {
+        ESP_LOGE(TAG_COMMS, "Could not acquire socket mutex for %s, this probably indicates a bug", conn->name);
+        return false;
+    }
 }
 
 static bool sa_comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
 {
-    ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
-    if (rlen == -1)
+    if (xSemaphoreTake(conn->sock_mutex, portMAX_DELAY) == pdTRUE)
     {
-        sa_comms_drop_connection(conn);
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
-        return false;
-    }
-    else if (rlen < len)
-    {
-        sa_comms_drop_connection(conn);
-        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
-        return false;
-    }
+        ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
+        if (rlen == -1)
+        {
+            sa_comms_drop_connection(conn);
+            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
+            xSemaphoreGive(conn->sock_mutex);
+            return false;
+        }
+        else if (rlen < len)
+        {
+            sa_comms_drop_connection(conn);
+            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
+            xSemaphoreGive(conn->sock_mutex);
+            return false;
+        }
 
-    return true;
+        xSemaphoreGive(conn->sock_mutex);
+        return true;
+    }
+    else
+    {
+        ESP_LOGE(TAG_COMMS, "Could not acquire socket mutex for %s, this probably indicates a bug", conn->name);
+        return false;
+    }
 }
 
 // Process the incoming command for conn, returning true
@@ -121,7 +143,7 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
             uint8_t h[SIMPLE_HMAC_LEN];
             memcpy(msg, rx_buf, SIMPLE_MSG_LEN);
             memcpy(h, rx_buf + SIMPLE_MSG_LEN, SIMPLE_HMAC_LEN);
-            simple_prover(msg, h, conn->sock);
+            simple_prover(msg, h, conn->sock, conn->sock_mutex);
             ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
         }
         break;
@@ -344,6 +366,13 @@ static void tcp_server_task(void *pvParameters)
             for (int i = 0; i < TCP_SERVER_MAX_CONNS; i++)
             {
                 tcp_conn_t *conn = &tcp_server.conns[i];
+
+                // Do not send heartbeats to verifier
+                if (strcmp(conn->name, "VERIFIER") == 0)
+                {
+                    continue;
+                }
+
                 if ((conn->open == true) && (conn->heartbeat == false))
                 {
                     // No response to heartbeat, drop connection
@@ -507,6 +536,7 @@ static bool tcp_server_start()
         tcp_server.conns[i].open = false;
         tcp_server.conns[i].heartbeat = false;
         tcp_server.conns[i].cmd_queue = xQueueCreate(COMMS_QUEUE_LENGTH, sizeof(comms_cmd_t));
+        tcp_server.conns[i].sock_mutex = xSemaphoreCreateMutex();
     }
     tcp_server.num_conns = 0;
 
@@ -563,6 +593,7 @@ static void tcp_client_start()
     tcp_client.server.open = false;
     tcp_client.server.heartbeat = false;
     tcp_client.server.cmd_queue = xQueueCreate(COMMS_QUEUE_LENGTH, sizeof(comms_cmd_t));
+    tcp_client.server.sock_mutex = xSemaphoreCreateMutex();
 
     // We are currently hardcoding each node's parent in the build config, so we already know the parent's name
     // A better implementation would be to have the server transmit its name to the client upon connection

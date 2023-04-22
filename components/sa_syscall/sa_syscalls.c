@@ -6,6 +6,7 @@
 #include "esp_wifi.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "sa_shared_defs.h"
 
@@ -78,8 +79,8 @@ void sys_wifi_init_config_default(wifi_init_config_t *cfg)
 
 // We will link against the sa_algorithms component library, but can't easily include the headers,
 // so forward declare the functions we need as extern
-extern void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock);
-void sys_simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock)
+extern void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, SemaphoreHandle_t response_sock_mutex);
+void sys_simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, SemaphoreHandle_t response_sock_mutex)
 {
-    simple_prover(msg, h, response_sock);
+    simple_prover(msg, h, response_sock, response_sock_mutex);
 }

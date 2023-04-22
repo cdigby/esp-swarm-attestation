@@ -12,12 +12,6 @@ void user_main()
     // Wifi is initialised before user app boot, so we can start comms immediately
     sa_comms_init();
 
-    uint8_t msg[68];
-    uint8_t h[32];
-    memset(h, 0, sizeof(h));
-    memset(msg, 0, sizeof(msg));
-    simple_prover(msg, h, 0);
-
     while (1)
     {
         // User code main loop

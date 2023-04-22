@@ -8,6 +8,9 @@
 #include "esp_wifi.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
+#include "sa_shared_defs.h"
 
 // Compiler will give this warning about all the syscall wrappers,
 // esp-privilege-separation/components/user/syscall_wrapper/syscall_wrappers.c ignores them too.
@@ -46,7 +49,7 @@ void usr_wifi_init_config_default(wifi_init_config_t *cfg)
     EXECUTE_SYSCALL(__NR_wifi_init_config_default);
 }
 
-void usr_simple_prover(uint8_t msg[68], uint8_t h[32], int response_sock)
+void usr_simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, SemaphoreHandle_t response_sock_mutex)
 {
-    EXECUTE_SYSCALL(msg, h, response_sock, __NR_simple_prover);
+    EXECUTE_SYSCALL(msg, h, response_sock, response_sock_mutex, __NR_simple_prover);
 }
