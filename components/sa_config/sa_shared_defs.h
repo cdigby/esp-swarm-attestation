@@ -10,4 +10,7 @@
 #define SIMPLE_MSG_CV_LEN           4
 #define SIMPLE_MSG_VS_LEN           32
 #define SIMPLE_MSG_NONCE_LEN        32
-#define SIMPLE_MSG_LEN              (SIMPLE_MSG_CV_LEN + SIMPLE_MSG_VS_LEN + SIMPLE_MSG_NONCE_LEN)  
+#define SIMPLE_MSG_LEN              (SIMPLE_MSG_CV_LEN + SIMPLE_MSG_VS_LEN + SIMPLE_MSG_NONCE_LEN)
+
+//// SIMPLE+ ////
+
