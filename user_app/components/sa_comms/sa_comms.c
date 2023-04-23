@@ -91,6 +91,37 @@ static bool sa_comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
     }
 }
 
+static size_t sa_comms_get_socks_and_mutexes(tcp_conn_t *exclude, int socks_out[TCP_SERVER_MAX_CONNS + 1], int mutexes_out[TCP_SERVER_MAX_CONNS + 1])
+{
+    size_t i = 0;
+    if (&tcp_client.server != exclude)
+    {
+        if (tcp_client.server.open == true)
+        {
+            socks_out[i] = tcp_client.server.sock;
+            mutexes_out[i] = tcp_client.server.sock_mutex;
+            i++;
+        }
+    }
+
+    for (int j = 0; j < TCP_SERVER_MAX_CONNS; j++)
+    {
+        if (tcp_server.conns[j].open == true && &tcp_server.conns[j] != exclude)
+        {
+            // Don't include VERIFIER
+            if (strcmp(tcp_server.conns[j].name, "VERIFIER") != 0)
+            {
+                socks_out[i] = tcp_server.conns[j].sock;
+                mutexes_out[i] = tcp_server.conns[j].sock_mutex;
+                i++;
+            }       
+        }
+    }
+
+    return i;
+}
+
+
 // Process the incoming command for conn, returning true
 // It is assumed that conn->sock has been polled and is ready to read
 // If an error occurs, conn will be dropped and false will be returned
@@ -106,7 +137,7 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
     {
         case CMD_HEARTBEAT_REQUEST:
         {
-            ESP_LOGI(TAG_COMMS, "Got heartbeat request from %s", conn->name);
+            // ESP_LOGI(TAG_COMMS, "Got heartbeat request from %s", conn->name);
             comms_cmd_t cmd =
             {
                 .cmd_code = CMD_HEARTBEAT_RESPONSE,
@@ -120,7 +151,7 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 
         case CMD_HEARTBEAT_RESPONSE:
         {
-            ESP_LOGI(TAG_COMMS, "Got heartbeat response from %s", conn->name);
+            // ESP_LOGI(TAG_COMMS, "Got heartbeat response from %s", conn->name);
             conn->heartbeat = true;
         }
         break;
@@ -159,6 +190,25 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
             return false;
         }
         break;
+
+        case CMD_SIMPLE_PLUS_ATTEST:
+        {
+            if (sa_comms_recv(conn, rx_buf, 2) == false) return false;
+            uint16_t attest_req_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
+
+            if (sa_comms_recv(conn, rx_buf, attest_req_len) == false) return false;
+
+            ESP_LOGI(TAG_COMMS, "Received SIMPLE+ attestation request from %s", conn->name);
+
+            // Generate array of all connected nodes
+            int socks[TCP_SERVER_MAX_CONNS + 1];    // + 1 for TCP client's server
+            int mutexes[TCP_SERVER_MAX_CONNS + 1];
+            size_t num_socks = sa_comms_get_socks_and_mutexes(conn, socks, mutexes);
+
+            // Make syscall - execute algorithm in protected space
+            simple_plus_prover_attest(rx_buf, attest_req_len, socks, mutexes, num_socks);
+            ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
+        }
     }
 
     return success;
@@ -180,7 +230,7 @@ static bool sa_comms_cmd_process_outgoing(tcp_conn_t *conn)
             success = sa_comms_send(conn, &cmd.cmd_code, 1);
             if (success == false) break;
 
-            ESP_LOGI(TAG_COMMS, "Sent heartbeat request to %s", conn->name);
+            // ESP_LOGI(TAG_COMMS, "Sent heartbeat request to %s", conn->name);
             conn->heartbeat = false;
         }
         break;
@@ -188,7 +238,7 @@ static bool sa_comms_cmd_process_outgoing(tcp_conn_t *conn)
         case CMD_HEARTBEAT_RESPONSE:
         {
             success = sa_comms_send(conn, &cmd.cmd_code, 1);
-            ESP_LOGI(TAG_COMMS, "Sent heartbeat response to %s", conn->name);
+            // ESP_LOGI(TAG_COMMS, "Sent heartbeat response to %s", conn->name);
         }
         break;
 

@@ -75,7 +75,7 @@ void sa_protected_recv(int sock, int sock_mutex, uint8_t *rx_buf, size_t len)
 
 void sa_protected_broadcast(uint8_t *data, size_t data_len, int *sockets, int *mutexes, size_t num_sockets)
 {
-    if (sockets == NULL || mutexes == NULL)
+    if (sockets == NULL || mutexes == NULL || num_sockets == 0)
     {
         return;
     }

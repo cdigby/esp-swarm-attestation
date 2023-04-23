@@ -82,6 +82,12 @@ void sys_simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int resp
     simple_prover(msg, msg_len, response_sock, response_sock_mutex);
 }
 
+extern void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets);
+void sys_simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets)
+{
+    simple_plus_prover_attest(attest_req, attest_req_len, sockets, mutexes, num_sockets);
+}
+
 // Return the gateway ip of the parent node
 // If not connected, 0 will be returned
 extern uint32_t sa_network_get_gateway_ip();

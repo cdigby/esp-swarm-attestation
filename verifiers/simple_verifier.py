@@ -25,9 +25,10 @@ CMD_SIMPLE_ATTEST = 0x05.to_bytes(1, byteorder="little")
 CMD_CLOSE_CONN    = 0x06.to_bytes(1, byteorder="little")
 
 # Fake memory region considered the valid state for the prover
-# Prover considered valid if all values in the region are 0 (unless changed in sa_build_config.h)
+# Prover considered valid if the hash of FAKE_MEMORY_REGION is equal to the hash of FAKE_MEMORY_REGION on the prover
+# The contents of FAKE_MEMORY_REGION on the prover can be configured in sa_build_config.h (0 by default)
 FAKE_MEMORY_REGION = b'\x00' * 1024         # VALID
-# FAKE_MEMORY_REGION = b'\x01' * 1024       # INVALID
+# FAKE_MEMORY_REGION = b'\xff' * 1024       # INVALID
 
 # Get node id from CLI args
 if len(sys.argv) != 2:
@@ -92,7 +93,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     set_verifier_counter(cv)
     print(f"Counter: {cv}")
 
-    # Compute valid software state
+    # Compute valid software state hash
     vs = hmac.digest(K_ATTEST, FAKE_MEMORY_REGION, hashlib.sha256)
 
     # Compute HMAC and construct message

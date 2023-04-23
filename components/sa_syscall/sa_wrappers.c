@@ -52,6 +52,11 @@ void usr_simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int resp
     EXECUTE_SYSCALL(msg, msg_len, response_sock, response_sock_mutex, __NR_simple_prover);
 }
 
+void usr_simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets)
+{
+    EXECUTE_SYSCALL(attest_req, attest_req_len, sockets, mutexes, num_sockets, __NR_simple_plus_prover_attest);
+}
+
 uint32_t usr_sa_network_get_gateway_ip()
 {
     return EXECUTE_SYSCALL(__NR_sa_network_get_gateway_ip);

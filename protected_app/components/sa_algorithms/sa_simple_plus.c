@@ -34,19 +34,22 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
         ((uint32_t)attest_req[SIMPLE_PLUS_ATTESTREQ_CV_OFFSET + 2] << 16) |
         ((uint32_t)attest_req[SIMPLE_PLUS_ATTESTREQ_CV_OFFSET + 3] << 24);
 
-    uint8_t nonce[SIMPLE_PLUS_ATTESTREQ_NONCE_LEN];
-    memcpy(nonce, attest_req + SIMPLE_PLUS_ATTESTREQ_NONCE_OFFSET, SIMPLE_PLUS_ATTESTREQ_NONCE_LEN);
-
-    // Although VSS comes 2nd in the algorithm, it is easier to put it last (but before HMAC) as it is variable-length
     uint16_t vss_len =
         (uint16_t)attest_req[SIMPLE_PLUS_ATTESTREQ_VSSLEN_OFFSET] |
         ((uint16_t)attest_req[SIMPLE_PLUS_ATTESTREQ_VSSLEN_OFFSET + 1] << 8);
 
+    size_t offset = SIMPLE_PLUS_ATTESTREQ_VSS_OFFSET;
+
     uint8_t *vss = malloc(vss_len);
-    memcpy(vss, attest_req + SIMPLE_PLUS_ATTESTREQ_VSS_OFFSET, vss_len);
+    memcpy(vss, attest_req + offset, vss_len);
+    offset += vss_len;
+
+    uint8_t nonce[SIMPLE_PLUS_ATTESTREQ_NONCE_LEN];
+    memcpy(nonce, attest_req + offset, SIMPLE_PLUS_ATTESTREQ_NONCE_LEN);
+    offset += SIMPLE_PLUS_ATTESTREQ_NONCE_LEN;
 
     uint8_t h[SIMPLE_PLUS_ATTESTREQ_HMAC_LEN];
-    memcpy(h, attest_req + SIMPLE_PLUS_ATTESTREQ_VSS_OFFSET + vss_len, SIMPLE_PLUS_ATTESTREQ_HMAC_LEN);
+    memcpy(h, attest_req + offset, SIMPLE_PLUS_ATTESTREQ_HMAC_LEN);
 
     // Algorithm as per Figure 4 of SIMPLE paper
     if (cp < cv)
@@ -63,7 +66,13 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
         if (memcmp(local_attest_req_hmac, h, SIMPLE_HMAC_LEN) == 0)
         {
             // Broadcast to other nodes
-            sa_protected_broadcast(attest_req, attest_req_len, sockets, mutexes, num_sockets);
+            uint8_t *broadcast_buf = malloc(3 + attest_req_len);
+            broadcast_buf[0] = CMD_SIMPLE_PLUS_ATTEST;
+            broadcast_buf[1] = (uint8_t)attest_req_len;
+            broadcast_buf[2] = (uint8_t)(attest_req_len >> 8);
+            memcpy(broadcast_buf + 3, attest_req, attest_req_len);
+            sa_protected_broadcast(broadcast_buf, 3 + attest_req_len, sockets, mutexes, num_sockets);
+            ESP_LOGI(TAG_SIMPLE_PLUS, "[Attest] Broadcasted attest_req to %d other nodes", num_sockets);
 
             // Check if software state is valid
             uint8_t vss_prime[SIMPLE_HMAC_LEN];
@@ -81,12 +90,12 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
             if (valid == true)
             {
                 attest = attest & 1;
-                ESP_LOGI(TAG_SIMPLE_PLUS, "Software state is valid");
+                ESP_LOGI(TAG_SIMPLE_PLUS, "[Attest] Software state is valid (attest = %d)", attest);
             } 
             else
             {
                 attest = attest & 0;
-                ESP_LOGW(TAG_SIMPLE_PLUS, "Software state is invalid");
+                ESP_LOGW(TAG_SIMPLE_PLUS, "[Attest] Software state is invalid (attest = %d)", attest);
             }
 
             // Update k_col
