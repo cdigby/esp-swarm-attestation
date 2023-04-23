@@ -209,6 +209,25 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
             simple_plus_prover_attest(rx_buf, attest_req_len, socks, mutexes, num_socks);
             ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
         }
+
+        case CMD_SIMPLE_PLUS_COLLECT:
+        {
+            if (sa_comms_recv(conn, rx_buf, 2) == false) return false;
+            uint16_t collect_req_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
+
+            if (sa_comms_recv(conn, rx_buf, collect_req_len) == false) return false;
+
+            ESP_LOGI(TAG_COMMS, "Received SIMPLE+ collection request from %s", conn->name);
+
+            // Generate array of all connected nodes
+            int socks[TCP_SERVER_MAX_CONNS + 1];    // + 1 for TCP client's server
+            int mutexes[TCP_SERVER_MAX_CONNS + 1];
+            size_t num_socks = sa_comms_get_socks_and_mutexes(conn, socks, mutexes);
+
+            // Make syscall - execute algorithm in protected space
+            simple_plus_prover_collect(rx_buf, collect_req_len, conn->sock, conn->sock_mutex, socks, mutexes, num_socks);
+            ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
+        }
     }
 
     return success;

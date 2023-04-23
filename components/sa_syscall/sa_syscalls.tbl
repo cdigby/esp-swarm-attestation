@@ -17,3 +17,4 @@
 # Attestation
 120  common  simple_prover                          sys_simple_prover
 121  common  simple_plus_prover_attest              sys_simple_plus_prover_attest
+122  common  simple_plus_prover_collect             sys_simple_plus_prover_collect

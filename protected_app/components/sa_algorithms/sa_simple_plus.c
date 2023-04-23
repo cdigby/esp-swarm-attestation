@@ -123,3 +123,32 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
 
     free(vss);
 }
+
+void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets)
+{
+    // Check that collect_req contains data and is not just an HMAC
+    if (collect_req_len <= SIMPLE_HMAC_LEN)
+    {
+        ESP_LOGE(TAG_SIMPLE_PLUS, "[Collect] Invalid collect_req length (%d)", collect_req_len);
+        return;
+    }
+
+    // Contents of collect_req is unimportant, as long as there is something we can compute an HMAC over and the HMAC is valid
+
+    // Algorithm as per Figure 5 of SIMPLE paper
+    // Check received HMAC against locally computed HMAC
+    uint8_t local_collect_req_hmac[SIMPLE_HMAC_LEN];
+    Hacl_HMAC_compute_sha2_256(
+        local_collect_req_hmac,
+        k_col,
+        SIMPLE_HMAC_LEN,
+        collect_req,
+        collect_req_len - SIMPLE_HMAC_LEN
+    );
+    if (memcmp(local_collect_req_hmac, collect_req - SIMPLE_HMAC_LEN, SIMPLE_HMAC_LEN) == 0)
+    {
+        // Send ACK to sender
+
+        // Broadcast to other nodes
+    }
+}

@@ -28,6 +28,7 @@
 #define CMD_SIMPLE_ATTEST           0x05
 #define CMD_CLOSE_CONN              0x06
 #define CMD_SIMPLE_PLUS_ATTEST      0x07
+#define CMD_SIMPLE_PLUS_COLLECT     0x08
 
 #define COMMS_TCP_PORT      3333
 #define COMMS_BUFFER_SIZE   256     // Size in bytes of tx and rx buffers for TCP client and server

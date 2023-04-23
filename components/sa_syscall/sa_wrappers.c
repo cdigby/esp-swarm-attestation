@@ -1,4 +1,8 @@
+#include <stdint.h>
+#include <stdbool.h>
+
 #include "sa_syscall.h"
+#include "sa_syscall_types.h"
 
 #include "syscall_macros.h"
 #include "syscall_def.h"
@@ -6,9 +10,6 @@
 #include "esp_err.h"
 #include "esp_netif_types.h"
 #include "esp_wifi.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 // Compiler will give this warning about all the syscall wrappers,
 // esp-privilege-separation/components/user/syscall_wrapper/syscall_wrappers.c ignores them too.
@@ -55,6 +56,22 @@ void usr_simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int resp
 void usr_simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets)
 {
     EXECUTE_SYSCALL(attest_req, attest_req_len, sockets, mutexes, num_sockets, __NR_simple_plus_prover_attest);
+}
+
+void usr_simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets)
+{
+    // Function has too many args to pass via syscall so we need to use a struct
+    sa_simple_plus_prover_collect_args_t args =
+    {
+        .collect_req = collect_req,
+        .collect_req_len = collect_req_len,
+        .sender_sock = sender_sock,
+        .sender_mutex = sender_mutex,
+        .sockets = sockets,
+        .mutexes = mutexes,
+        .num_sockets = num_sockets
+    };
+    EXECUTE_SYSCALL(&args, __NR_simple_plus_prover_collect);
 }
 
 uint32_t usr_sa_network_get_gateway_ip()

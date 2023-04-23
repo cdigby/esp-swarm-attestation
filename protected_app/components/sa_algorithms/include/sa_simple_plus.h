@@ -14,6 +14,7 @@
 // Ideally, we would want some way of generating valid comms packets without needing information from the comms stack
 // at compile time
 #define CMD_SIMPLE_PLUS_ATTEST      0x07
+#define CMD_SIMPLE_PLUS_COLLECT     0x08
 
 // Structure of SIMPLE+ AttestReq
 // Since we are reading this from a uint8_t array sent over the network by a python script, it is simpler
@@ -28,4 +29,8 @@
 #define SIMPLE_PLUS_ATTESTREQ_VSSLEN_OFFSET (SIMPLE_PLUS_ATTESTREQ_CV_OFFSET + SIMPLE_PLUS_ATTESTREQ_CV_LEN)
 #define SIMPLE_PLUS_ATTESTREQ_VSS_OFFSET    (SIMPLE_PLUS_ATTESTREQ_VSSLEN_OFFSET + SIMPLE_PLUS_ATTESTREQ_VSSLEN_LEN)
 
+// String used to generate the HMAC for CollectReq
+#define SIMPLE_PLUS_COLLECTREQ_HMAC_STRING  "collect"
+
 void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets);
+void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets);

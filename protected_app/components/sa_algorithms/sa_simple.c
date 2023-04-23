@@ -22,7 +22,7 @@ void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response
 {
     if (msg_len != SIMPLE_MSG_LEN)
     {
-        ESP_LOGE(TAG_SIMPLE, "Invalid message length");
+        ESP_LOGE(TAG_SIMPLE, "Invalid message length (%d)", msg_len);
         return;
     }
 
