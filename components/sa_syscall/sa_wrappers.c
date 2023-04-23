@@ -10,8 +10,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
-#include "sa_shared_defs.h"
-
 // Compiler will give this warning about all the syscall wrappers,
 // esp-privilege-separation/components/user/syscall_wrapper/syscall_wrappers.c ignores them too.
 #ifdef __GNUC__
@@ -49,9 +47,9 @@
 //     EXECUTE_SYSCALL(__NR_wifi_init_config_default);
 // }
 
-void usr_simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, int response_sock_mutex)
+void usr_simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex)
 {
-    EXECUTE_SYSCALL(msg, h, response_sock, response_sock_mutex, __NR_simple_prover);
+    EXECUTE_SYSCALL(msg, msg_len, response_sock, response_sock_mutex, __NR_simple_prover);
 }
 
 uint32_t usr_sa_network_get_gateway_ip()

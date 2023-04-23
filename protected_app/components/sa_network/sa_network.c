@@ -1,5 +1,7 @@
 #include "sa_network.h"
 
+static const char *TAG_NETWORK = "NETWORK LOG";
+
 static esp_netif_t *ap_netif;
 static esp_netif_t *sta_netif;
 

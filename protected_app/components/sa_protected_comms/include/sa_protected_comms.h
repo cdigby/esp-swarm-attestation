@@ -9,8 +9,6 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 
-#include "sa_shared_defs.h"
-
 #define SA_MAX_PROTECTED_MUTEXES 64
 
 // Functions for sending an receiving data from within the protected app

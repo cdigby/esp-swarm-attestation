@@ -1,13 +1,15 @@
 import os, sys, socket, secrets, hmac, hashlib
 
-# Definitions from sa_shared_defs.h
+# Definitions from sa_shared.h
 SIMPLE_KEY_SIZE         = 32
 SIMPLE_HMAC_LEN         = 32
 
-SIMPLE_MSG_CV_LEN       = 4
-SIMPLE_MSG_VS_LEN       = 32
-SIMPLE_MSG_NONCE_LEN    = 32
-SIMPLE_MSG_LEN          = (SIMPLE_MSG_CV_LEN + SIMPLE_MSG_VS_LEN + SIMPLE_MSG_NONCE_LEN)
+# Structure of a SIMPLE msg, from sa_simple.h
+SIMPLE_MSG_CV_LEN           = 4
+SIMPLE_MSG_VS_LEN           = 32
+SIMPLE_MSG_NONCE_LEN        = 32
+SIMPLE_MSG_HMAC_LEN         = SIMPLE_HMAC_LEN
+SIMPLE_MSG_LEN              = (SIMPLE_MSG_CV_LEN + SIMPLE_MSG_VS_LEN + SIMPLE_MSG_NONCE_LEN + SIMPLE_MSG_HMAC_LEN)
 
 # Structure of SIMPLE report, from sa_simple.h
 SIMPLE_REPORT_VALUE_LEN     = 1
@@ -23,7 +25,7 @@ CMD_SIMPLE_ATTEST = 0x05.to_bytes(1, byteorder="little")
 CMD_CLOSE_CONN    = 0x06.to_bytes(1, byteorder="little")
 
 # Fake memory region considered the valid state for the prover
-# Prover considered valid if all values in the region are 0
+# Prover considered valid if all values in the region are 0 (unless changed in sa_build_config.h)
 FAKE_MEMORY_REGION = b'\x00' * 1024         # VALID
 # FAKE_MEMORY_REGION = b'\x01' * 1024       # INVALID
 
@@ -93,13 +95,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     # Compute valid software state
     vs = hmac.digest(K_ATTEST, FAKE_MEMORY_REGION, hashlib.sha256)
 
-    # Construct message and compute HMAC
-    msg = cv.to_bytes(4, byteorder='little') + vs + nonce
-    h = hmac.digest(K_AUTH, msg, hashlib.sha256)
+    # Compute HMAC and construct message
+    msg_data = cv.to_bytes(4, byteorder='little') + vs + nonce
+    h = hmac.digest(K_AUTH, msg_data, hashlib.sha256)
+    msg = msg_data + h
 
     # Send message to node
     print(f"Sending attestation request...")
-    s.send(CMD_SIMPLE_ATTEST + msg + h)
+    s.send(CMD_SIMPLE_ATTEST + len(msg).to_bytes(2, byteorder='little') + msg)
 
     # Get report
     print("Waiting for response...")

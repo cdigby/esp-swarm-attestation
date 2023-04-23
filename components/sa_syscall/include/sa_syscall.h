@@ -2,12 +2,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
-#include "sa_shared_defs.h"
+#include <stddef.h>
 
 // void wifi_init_config_default(wifi_init_config_t *cfg);
 
-void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, int response_sock_mutex);
+void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex);
 
 uint32_t sa_network_get_gateway_ip();
 

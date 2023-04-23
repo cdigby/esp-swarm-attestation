@@ -1,5 +1,7 @@
 #include "user_code.h"
 
+static const char *TAG_USER = "USERSPACE LOG";
+
 // #define TEST_MSG "Hello!"
 
 void user_main()

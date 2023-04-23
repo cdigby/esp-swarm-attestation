@@ -1,5 +1,7 @@
 #include "sa_simple.h"
 
+static const char *TAG_SIMPLE = "SIMPLE LOG";
+
 // STATIC DATA STORED IN PROTECTED MEMORY
 // Marked as DRAM_ATTR to be certain that these are placed in RAM and not flash
 static DRAM_ATTR uint8_t k_auth[SIMPLE_KEY_SIZE] =    // Authentication key
@@ -16,8 +18,14 @@ static DRAM_ATTR uint8_t k_attest[SIMPLE_KEY_SIZE] =    // Attestation key
 
 static DRAM_ATTR uint32_t cp = 0;             // Prover counter
 
-void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, int response_sock_mutex)
+void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex)
 {
+    if (msg_len != SIMPLE_MSG_LEN)
+    {
+        ESP_LOGE(TAG_SIMPLE, "Invalid message length");
+        return;
+    }
+
     // Parse msg
     uint32_t cv =
         (uint32_t)msg[SIMPLE_MSG_CV_OFFSET] |
@@ -27,16 +35,18 @@ void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int 
         
     uint8_t vs[SIMPLE_MSG_VS_LEN];
     uint8_t nonce[SIMPLE_MSG_NONCE_LEN];
+    uint8_t h[SIMPLE_MSG_HMAC_LEN];
     memcpy(vs, msg + SIMPLE_MSG_VS_OFFSET, SIMPLE_MSG_VS_LEN);
     memcpy(nonce, msg + SIMPLE_MSG_NONCE_OFFSET, SIMPLE_MSG_NONCE_LEN);
+    memcpy(h, msg + SIMPLE_MSG_HMAC_OFFSET, SIMPLE_MSG_HMAC_LEN);
 
     // Algorithm as per Figure 2 of SIMPLE paper
     if (cp < cv)
     {
         // Check received HMAC against locally computed HMAC
-        uint8_t hmac_msg[SIMPLE_HMAC_LEN];
-        Hacl_HMAC_compute_sha2_256(hmac_msg, k_auth, SIMPLE_KEY_SIZE, msg, SIMPLE_MSG_LEN);
-        if (memcmp(hmac_msg, h, SIMPLE_HMAC_LEN) == 0)
+        uint8_t local_msg_data_hmac[SIMPLE_HMAC_LEN];
+        Hacl_HMAC_compute_sha2_256(local_msg_data_hmac, k_auth, SIMPLE_KEY_SIZE, msg, SIMPLE_MSG_LEN - SIMPLE_MSG_HMAC_LEN);
+        if (memcmp(local_msg_data_hmac, h, SIMPLE_HMAC_LEN) == 0)
         {
             // Increment counter
             cp = cv;
@@ -60,16 +70,27 @@ void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int 
                 report[SIMPLE_REPORT_VALUE_OFFSET] = 1;
                 report_hmac_data_buf[SIMPLE_HMAC_DATA_VALUE_OFFSET] = 1;
                 Hacl_HMAC_compute_sha2_256(report + SIMPLE_REPORT_HMAC_OFFSET, k_auth, SIMPLE_KEY_SIZE, report_hmac_data_buf, SIMPLE_HMAC_DATA_LEN);
+                ESP_LOGI(TAG_SIMPLE, "Software state is valid");
             }
             else
             {
                 report[SIMPLE_REPORT_VALUE_OFFSET] = 0;
                 report_hmac_data_buf[SIMPLE_HMAC_DATA_VALUE_OFFSET] = 0;
                 Hacl_HMAC_compute_sha2_256(report + SIMPLE_REPORT_HMAC_OFFSET, k_auth, SIMPLE_KEY_SIZE, report_hmac_data_buf, SIMPLE_HMAC_DATA_LEN);
+                ESP_LOGW(TAG_SIMPLE, "Software state is invalid");
             }
 
             // Send report
             sa_protected_send(response_sock, response_sock_mutex, report, SIMPLE_REPORT_LEN);
+            ESP_LOGI(TAG_SIMPLE, "Report sent");
         }
+        else
+        {
+            ESP_LOGE(TAG_SIMPLE, "HMAC mismatch");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG_SIMPLE, "cp is greater than or equal to cv (%u >= %u)", cp, cv);
     }
 }

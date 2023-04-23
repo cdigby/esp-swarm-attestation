@@ -7,8 +7,6 @@
 // #include "esp_netif.h"
 // #include "esp_wifi.h"
 
-#include "sa_shared_defs.h"
-
 
 // // Adapted from sys_esp_netif_create_default_wifi_sta() in esp_privilege_separation/components/protected/src/esp_syscalls.c
 // esp_netif_t *sys_esp_netif_create_default_wifi_ap()
@@ -78,10 +76,10 @@
 
 // We will link against the sa_algorithms component library, but can't easily include the headers,
 // so forward declare the functions we need as extern
-extern void simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, int response_sock_mutex);
-void sys_simple_prover(uint8_t msg[SIMPLE_MSG_LEN], uint8_t h[SIMPLE_HMAC_LEN], int response_sock, int response_sock_mutex)
+extern void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex);
+void sys_simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex)
 {
-    simple_prover(msg, h, response_sock, response_sock_mutex);
+    simple_prover(msg, msg_len, response_sock, response_sock_mutex);
 }
 
 // Return the gateway ip of the parent node

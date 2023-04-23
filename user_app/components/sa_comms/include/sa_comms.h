@@ -19,7 +19,6 @@
 #include "esp_err.h"
 
 #include "sa_build_config.h"
-#include "sa_shared_defs.h"
 #include "sa_syscall.h"
 
 #define CMD_NODE_NAME               0x01    // Transmit the node's name
@@ -79,8 +78,6 @@ typedef struct
     uint8_t tx_buf[COMMS_BUFFER_SIZE];
     uint8_t rx_buf[COMMS_BUFFER_SIZE];
 } tcp_client_t;
-
-static const char *TAG_COMMS = "COMMS LOG";
 
 bool sa_comms_init();
 void sa_comms_broadcast(comms_cmd_t *cmd);

@@ -1,5 +1,7 @@
 #include "sa_comms.h"
 
+static const char *TAG_COMMS = "COMMS LOG";
+
 static tcp_server_t tcp_server;
 static tcp_client_t tcp_client;
 
@@ -135,15 +137,15 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 
         case CMD_SIMPLE_ATTEST:
         {
-            if (sa_comms_recv(conn, rx_buf, SIMPLE_MSG_LEN + SIMPLE_HMAC_LEN) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, 2) == false) return false;
+            uint16_t msg_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
+
+            if (sa_comms_recv(conn, rx_buf, msg_len) == false) return false;
+
             ESP_LOGI(TAG_COMMS, "Received SIMPLE attestation request from %s", conn->name);
 
             // Make syscall - execute algorithm in protected space
-            uint8_t msg[SIMPLE_MSG_LEN];
-            uint8_t h[SIMPLE_HMAC_LEN];
-            memcpy(msg, rx_buf, SIMPLE_MSG_LEN);
-            memcpy(h, rx_buf + SIMPLE_MSG_LEN, SIMPLE_HMAC_LEN);
-            simple_prover(msg, h, conn->sock, conn->sock_mutex);
+            simple_prover(rx_buf, msg_len, conn->sock, conn->sock_mutex);
             ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
         }
         break;

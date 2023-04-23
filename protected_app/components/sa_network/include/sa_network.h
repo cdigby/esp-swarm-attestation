@@ -15,7 +15,5 @@
 
 #include "sa_build_config.h"
 
-static const char *TAG_NETWORK = "NETWORK LOG";
-
 void sa_network_init();
 uint32_t sa_network_get_gateway_ip();
