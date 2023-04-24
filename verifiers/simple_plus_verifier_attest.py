@@ -4,7 +4,7 @@ import os, sys, socket, secrets, hmac, hashlib
 SIMPLE_KEY_SIZE         = 32
 SIMPLE_HMAC_LEN         = 32
 
-# Structure of a SIMPLE+ AttestReq, from sa_simple_plus.h
+# Structure of a SIMPLE+ attest_req, from sa_simple_plus.h
 SIMPLE_PLUS_ATTESTREQ_CV_LEN        = 4
 SIMPLE_PLUS_ATTESTREQ_NONCE_LEN     = 32
 SIMPLE_PLUS_ATTESTREQ_VSSLEN_LEN    = 2

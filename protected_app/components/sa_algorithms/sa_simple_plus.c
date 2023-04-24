@@ -25,6 +25,13 @@ static DRAM_ATTR uint8_t k_col[SIMPLE_HMAC_LEN] =   // Collection key, updated b
 static DRAM_ATTR uint32_t cp = 0;             // Prover counter
 static DRAM_ATTR uint8_t attest = 1;          // Attestation status
 
+static int64_t get_time_ms()
+{
+    struct timeval tv_now;
+    gettimeofday(&tv_now, NULL);
+    return (int64_t)(((int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec) / 1000);
+}
+
 void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets)
 {
     // Parse attest_req
@@ -65,14 +72,15 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
         );
         if (memcmp(local_attest_req_hmac, h, SIMPLE_HMAC_LEN) == 0)
         {
-            // Broadcast to other nodes
+            // Broadcast attest_req to other nodes
             uint8_t *broadcast_buf = malloc(3 + attest_req_len);
             broadcast_buf[0] = CMD_SIMPLE_PLUS_ATTEST;
             broadcast_buf[1] = (uint8_t)attest_req_len;
             broadcast_buf[2] = (uint8_t)(attest_req_len >> 8);
             memcpy(broadcast_buf + 3, attest_req, attest_req_len);
             sa_protected_broadcast(broadcast_buf, 3 + attest_req_len, sockets, mutexes, num_sockets);
-            ESP_LOGI(TAG_SIMPLE_PLUS, "[Attest] Broadcasted attest_req to %d other nodes", num_sockets);
+            free(broadcast_buf);
+            ESP_LOGI(TAG_SIMPLE_PLUS, "[attest] Broadcasted attest_req to %d other nodes", num_sockets);
 
             // Check if software state is valid
             uint8_t vss_prime[SIMPLE_HMAC_LEN];
@@ -90,12 +98,16 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
             if (valid == true)
             {
                 attest = attest & 1;
-                ESP_LOGI(TAG_SIMPLE_PLUS, "[Attest] Software state is valid (attest = %d)", attest);
+                ESP_LOGI(TAG_SIMPLE_PLUS, "[attest] Software state is valid");
+                if (attest == 0)
+                {
+                    ESP_LOGW(TAG_SIMPLE_PLUS, "[attest] Software state was invalid in the past", attest);
+                }
             } 
             else
             {
                 attest = attest & 0;
-                ESP_LOGW(TAG_SIMPLE_PLUS, "[Attest] Software state is invalid (attest = %d)", attest);
+                ESP_LOGW(TAG_SIMPLE_PLUS, "[attest] Software state is invalid");
             }
 
             // Update k_col
@@ -113,12 +125,12 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
         }
         else
         {
-            ESP_LOGE(TAG_SIMPLE_PLUS, "[Attest] HMAC mismatch");
+            ESP_LOGE(TAG_SIMPLE_PLUS, "[attest] HMAC mismatch");
         }
     }
     else
     {
-        ESP_LOGE(TAG_SIMPLE_PLUS, "[Attest] cp is greater than or equal to cv (%u >= %u)", cp, cv);
+        ESP_LOGE(TAG_SIMPLE_PLUS, "[attest] cp is greater than or equal to cv (%u >= %u)", cp, cv);
     }
 
     free(vss);
@@ -127,13 +139,19 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
 void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets)
 {
     // Check that collect_req contains data and is not just an HMAC
-    if (collect_req_len <= SIMPLE_HMAC_LEN)
+    if (collect_req_len != SIMPLE_PLUS_COLLECTREQ_LEN)
     {
-        ESP_LOGE(TAG_SIMPLE_PLUS, "[Collect] Invalid collect_req length (%d)", collect_req_len);
+        ESP_LOGE(TAG_SIMPLE_PLUS, "[collect] Invalid collect_req length (%d)", collect_req_len);
         return;
     }
 
-    // Contents of collect_req is unimportant, as long as there is something we can compute an HMAC over and the HMAC is valid
+    // Parse collect_req
+    uint16_t timeout =
+        (uint16_t)collect_req[SIMPLE_PLUS_COLLECTREQ_TIMEOUT_OFFSET] |
+        ((uint16_t)collect_req[SIMPLE_PLUS_COLLECTREQ_TIMEOUT_OFFSET + 1] << 8);
+
+    uint8_t h[SIMPLE_PLUS_COLLECTREQ_HMAC_LEN];
+    memcpy(h, collect_req + SIMPLE_PLUS_COLLECTREQ_HMAC_OFFSET, SIMPLE_PLUS_ATTESTREQ_HMAC_LEN);
 
     // Algorithm as per Figure 5 of SIMPLE paper
     // Check received HMAC against locally computed HMAC
@@ -145,10 +163,134 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         collect_req,
         collect_req_len - SIMPLE_HMAC_LEN
     );
-    if (memcmp(local_collect_req_hmac, collect_req - SIMPLE_HMAC_LEN, SIMPLE_HMAC_LEN) == 0)
+    if (memcmp(local_collect_req_hmac, h, SIMPLE_HMAC_LEN) == 0)
     {
         // Send ACK to sender
+        uint8_t ack_buf = CMD_SIMPLE_PLUS_COLLECT_ACK;
+        sa_protected_send(sender_sock, sender_mutex, &ack_buf, 1);
+        ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] ACK sent");
 
-        // Broadcast to other nodes
+        // Broadcast collect_req to other nodes
+        uint8_t *broadcast_buf = malloc(3 + collect_req_len);
+        broadcast_buf[0] = CMD_SIMPLE_PLUS_COLLECT;
+        broadcast_buf[1] = (uint8_t)collect_req_len;
+        broadcast_buf[2] = (uint8_t)(collect_req_len >> 8);
+        memcpy(broadcast_buf + 3, collect_req, collect_req_len);
+        sa_protected_broadcast(broadcast_buf, 3 + collect_req_len, sockets, mutexes, num_sockets);
+        free(broadcast_buf);
+        ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] Broadcasted collect_req to %d other nodes", num_sockets);
+
+        // Wait for ACKs from other nodes, will wait until timeout or until all connected nodes have sent an ACK
+        uint8_t rx_buf[2];
+        memset(rx_buf, 0, 2);
+        int num_acks = 0;
+        int64_t start_time = get_time_ms();
+        while (get_time_ms() - start_time < timeout)
+        {
+            for (int i = 0; i < num_sockets; i++)
+            {
+                if (sa_protected_recv(sockets[i], mutexes[i], rx_buf, 1) != 1)
+                {
+                    continue;
+                }
+
+                if (rx_buf[0] == CMD_SIMPLE_PLUS_COLLECT_ACK)
+                {
+                    num_acks++;
+                }
+            }
+
+            if (num_acks >= num_sockets)
+            {
+                break;
+            }
+        }
+        ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] ACKs received: %d/%d", num_acks, num_sockets);
+
+        // Generate this node's attestation report
+        size_t aggregated_report_len = SIMPLE_PLUS_INITIAL_REPORT_LEN;
+        uint8_t *aggregated_report = malloc(aggregated_report_len);
+        memset(aggregated_report, 0, aggregated_report_len);
+        if (attest == 1)
+        {
+            // Set the (NODE_ID - 1)th bit of local_report
+            // We subtract 1 as NODE_ID starts at 1 (for IP address generation reasons)
+            aggregated_report[aggregated_report_len - 1] = 0x01 << (NODE_ID - 1);
+        }
+
+        // Aggregate other reports
+        int num_reports = 0;
+        memset(rx_buf, 0, 2);
+        start_time = get_time_ms();
+        while (get_time_ms() - start_time < timeout)
+        {
+            for (int i = 0; i < num_sockets; i++)
+            {
+                // Get command code
+                if (sa_protected_recv(sockets[i], mutexes[i], rx_buf, 1) != 1)
+                {
+                    continue;
+                }
+
+                if (rx_buf[0] != CMD_SIMPLE_PLUS_COLLECT_REPORT)
+                {
+                    continue;
+                }
+
+                // Get report length
+                if (sa_protected_recv(sockets[i], mutexes[i], rx_buf, 2) != 2)
+                {
+                    continue;
+                }
+
+                uint16_t report_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
+                uint8_t *report_buf = malloc(report_len);
+
+                // Get report
+                if (sa_protected_recv(sockets[i], mutexes[i], report_buf, report_len) != report_len)
+                {
+                    free(report_buf);
+                    continue;
+                }
+
+                // If received report is longer than our report, we need to allocate more memory
+                if (report_len > aggregated_report_len)
+                {
+                    aggregated_report = realloc(aggregated_report, report_len);
+                    aggregated_report_len = report_len;
+                }
+
+                // Aggregate reports
+                for (int i = 0; i < report_len; i++)
+                {
+                    aggregated_report[i] |= report_buf[i];
+                }
+
+                num_reports++;
+                free(report_buf);
+            }
+
+            if (num_reports >= num_acks)
+            {
+                break;
+            }
+        }
+        ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] Reports received: %d/%d", num_reports, num_acks);
+
+        // Send aggregated report
+        uint8_t *tx_buf = malloc(3 + aggregated_report_len);
+        tx_buf[0] = CMD_SIMPLE_PLUS_COLLECT_REPORT;
+        tx_buf[1] = (uint8_t)aggregated_report_len;
+        tx_buf[2] = (uint8_t)(aggregated_report_len >> 8);
+        memcpy(tx_buf + 3, aggregated_report, aggregated_report_len);
+        sa_protected_send(sender_sock, sender_mutex, tx_buf, 3 + aggregated_report_len);
+        free(tx_buf);
+        ESP_LOGI(TAG_SIMPLE_PLUS, "Aggregated report sent");
+
+        free(aggregated_report);
+    }
+    else
+    {
+        ESP_LOGE(TAG_SIMPLE_PLUS, "[Collect] HMAC mismatch");
     }
 }

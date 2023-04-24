@@ -22,5 +22,5 @@ bool sa_protected_mutex_lock(int mutex_handle);
 void sa_protected_mutex_unlock(int mutex_handle);
 
 void sa_protected_send(int sock, int sock_mutex, uint8_t *data, size_t data_len);
-void sa_protected_recv(int sock, int sock_mutex, uint8_t *rx_buf, size_t len);
+int sa_protected_recv(int sock, int sock_mutex, uint8_t *rx_buf, size_t len);
 void sa_protected_broadcast(uint8_t *data, size_t data_len, int *sockets, int *mutexes, size_t num_sockets);

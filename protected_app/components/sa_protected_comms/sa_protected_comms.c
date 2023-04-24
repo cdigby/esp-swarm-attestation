@@ -64,13 +64,31 @@ void sa_protected_send(int sock, int sock_mutex, uint8_t *data, size_t data_len)
     }
 }
 
-void sa_protected_recv(int sock, int sock_mutex, uint8_t *rx_buf, size_t len)
+int sa_protected_recv(int sock, int sock_mutex, uint8_t *rx_buf, size_t len)
 {
     if (sa_protected_mutex_lock(sock_mutex) == true)
     {
-        recv(sock, rx_buf, len, MSG_WAITALL);
-        sa_protected_mutex_unlock(sock_mutex);
+        struct pollfd sock_poll = 
+        {
+            .fd = sock,
+            .events = POLLIN,
+            .revents = 0,
+        };
+
+        poll(&sock_poll, 1, 0);
+        if (sock_poll.revents & POLLIN)
+        {
+            sa_protected_mutex_unlock(sock_mutex);
+            return recv(sock, rx_buf, len, MSG_WAITALL);
+        }
+        else
+        {
+            sa_protected_mutex_unlock(sock_mutex);
+            return 0;
+        } 
     }
+
+    return -1;
 }
 
 void sa_protected_broadcast(uint8_t *data, size_t data_len, int *sockets, int *mutexes, size_t num_sockets)
