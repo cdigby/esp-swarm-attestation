@@ -32,7 +32,7 @@ static int64_t get_time_ms()
     return (int64_t)(((int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec) / 1000);
 }
 
-void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets)
+void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets)
 {
     // Parse attest_req
     uint32_t cv =
@@ -78,7 +78,7 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
             broadcast_buf[1] = (uint8_t)attest_req_len;
             broadcast_buf[2] = (uint8_t)(attest_req_len >> 8);
             memcpy(broadcast_buf + 3, attest_req, attest_req_len);
-            sa_protected_broadcast(broadcast_buf, 3 + attest_req_len, sockets, mutexes, num_sockets);
+            sa_protected_broadcast(broadcast_buf, 3 + attest_req_len, sockets, num_sockets);
             free(broadcast_buf);
             ESP_LOGI(TAG_SIMPLE_PLUS, "[attest] Broadcasted attest_req to %d other nodes", num_sockets);
 
@@ -136,7 +136,7 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
     free(vss);
 }
 
-void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets)
+void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets)
 {
     // Check that collect_req contains data and is not just an HMAC
     if (collect_req_len != SIMPLE_PLUS_COLLECTREQ_LEN)
@@ -167,7 +167,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
     {
         // Send ACK to sender
         uint8_t ack_buf = CMD_SIMPLE_PLUS_COLLECT_ACK;
-        sa_protected_send(sender_sock, sender_mutex, &ack_buf, 1);
+        sa_protected_send(sender_sock, &ack_buf, 1);
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] ACK sent");
 
         // Broadcast collect_req to other nodes
@@ -176,26 +176,44 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         broadcast_buf[1] = (uint8_t)collect_req_len;
         broadcast_buf[2] = (uint8_t)(collect_req_len >> 8);
         memcpy(broadcast_buf + 3, collect_req, collect_req_len);
-        sa_protected_broadcast(broadcast_buf, 3 + collect_req_len, sockets, mutexes, num_sockets);
+        sa_protected_broadcast(broadcast_buf, 3 + collect_req_len, sockets, num_sockets);
         free(broadcast_buf);
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] Broadcasted collect_req to %d other nodes", num_sockets);
 
         // Wait for ACKs from other nodes, will wait until timeout or until all connected nodes have sent an ACK
         uint8_t rx_buf[2];
         memset(rx_buf, 0, 2);
+
+        // Use this array to flag as true sockets that have received an ACK
+        // sockets[i] corresponds to got_ack[i]
+        // If we try and recv from a socket that already sent an ack, we may accidentally discard a report
         int num_acks = 0;
+        bool *got_ack = malloc(num_sockets);
+        for (int i = 0; i < num_sockets; i++)
+        {
+            got_ack[i] = false;
+        }
+
         int64_t start_time = get_time_ms();
         while (get_time_ms() - start_time < timeout)
         {
             for (int i = 0; i < num_sockets; i++)
             {
-                if (sa_protected_recv(sockets[i], mutexes[i], rx_buf, 1) != 1)
+                // Skip sockets that already sent an ack
+                if (got_ack[i] == true)
+                {
+                    continue;
+                }
+
+                // Try and receive an ACK
+                if (sa_protected_recv(sockets[i], rx_buf, 1) != 1)
                 {
                     continue;
                 }
 
                 if (rx_buf[0] == CMD_SIMPLE_PLUS_COLLECT_ACK)
                 {
+                    got_ack[i] = true;
                     num_acks++;
                 }
             }
@@ -219,15 +237,35 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         }
 
         // Aggregate other reports
-        int num_reports = 0;
         memset(rx_buf, 0, 2);
+
+        // As before, we use got_report to flag sockets that have sent a report
+        int num_reports = 0;
+        bool *got_report = malloc(num_acks);
+        for (int i = 0; i < num_acks; i++)
+        {
+            got_report[i] = false;
+        }
+
         start_time = get_time_ms();
         while (get_time_ms() - start_time < timeout)
         {
             for (int i = 0; i < num_sockets; i++)
             {
+                // Skip sockets that didn't send ACK
+                if (got_ack[i] == false)
+                {
+                    continue;
+                }
+
+                // Skip sockets that already sent a report
+                if (got_report[i] == true)
+                {
+                    continue;
+                }
+
                 // Get command code
-                if (sa_protected_recv(sockets[i], mutexes[i], rx_buf, 1) != 1)
+                if (sa_protected_recv(sockets[i], rx_buf, 1) != 1)
                 {
                     continue;
                 }
@@ -238,7 +276,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 }
 
                 // Get report length
-                if (sa_protected_recv(sockets[i], mutexes[i], rx_buf, 2) != 2)
+                if (sa_protected_recv(sockets[i], rx_buf, 2) != 2)
                 {
                     continue;
                 }
@@ -247,7 +285,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 uint8_t *report_buf = malloc(report_len);
 
                 // Get report
-                if (sa_protected_recv(sockets[i], mutexes[i], report_buf, report_len) != report_len)
+                if (sa_protected_recv(sockets[i], report_buf, report_len) != report_len)
                 {
                     free(report_buf);
                     continue;
@@ -275,6 +313,8 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 break;
             }
         }
+        free(got_ack);
+        free(got_report);
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] Reports received: %d/%d", num_reports, num_acks);
 
         // Send aggregated report
@@ -283,7 +323,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         tx_buf[1] = (uint8_t)aggregated_report_len;
         tx_buf[2] = (uint8_t)(aggregated_report_len >> 8);
         memcpy(tx_buf + 3, aggregated_report, aggregated_report_len);
-        sa_protected_send(sender_sock, sender_mutex, tx_buf, 3 + aggregated_report_len);
+        sa_protected_send(sender_sock, tx_buf, 3 + aggregated_report_len);
         free(tx_buf);
         ESP_LOGI(TAG_SIMPLE_PLUS, "Aggregated report sent");
 

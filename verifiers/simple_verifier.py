@@ -31,8 +31,8 @@ FAKE_MEMORY_REGION = b'\x00' * 1024         # VALID
 # FAKE_MEMORY_REGION = b'\xff' * 1024       # INVALID
 
 # Get node id from CLI args
-if len(sys.argv) != 2:
-    print("Usage: python3 simple_verifier.py NODE_ID")
+if len(sys.argv) != 3:
+    print("Usage: python3 simple_verifier.py NODE_ID MEMORY_VALUE")
     sys.exit(1)
 
 NODE_ID = None
@@ -41,6 +41,19 @@ try :
 except ValueError:
     print("NODE_ID must be an integer")
     sys.exit(1)
+
+MEMORY_VALUE = None
+try :
+    MEMORY_VALUE = int(sys.argv[2])
+except ValueError:
+    print("MEMORY_VALUE must be an integer")
+    sys.exit(1)
+
+if MEMORY_VALUE > 255:
+    print("MEMORY_VALUE must be <= 255")
+    sys.exit(1)
+
+FAKE_MEMORY_REGION = MEMORY_VALUE.to_bytes(1, byteorder="little") * (64 * 1024) 
 
 # Generate host IP
 HOST = f"192.168.{NODE_ID}.1"

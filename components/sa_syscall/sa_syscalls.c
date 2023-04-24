@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "sa_syscall_types.h"
-
 // #include "esp_map.h"
 // #include "esp_netif.h"
 // #include "esp_wifi.h"
@@ -78,30 +76,22 @@
 
 // We will link against the sa_algorithms component library, but can't easily include the headers,
 // so forward declare the functions we need as extern
-extern void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex);
-void sys_simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex)
+extern void simple_prover(uint8_t *msg, size_t msg_len, int response_sock);
+void sys_simple_prover(uint8_t *msg, size_t msg_len, int response_sock)
 {
-    simple_prover(msg, msg_len, response_sock, response_sock_mutex);
+    simple_prover(msg, msg_len, response_sock);
 }
 
-extern void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets);
-void sys_simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets)
+extern void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets);
+void sys_simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets)
 {
-    simple_plus_prover_attest(attest_req, attest_req_len, sockets, mutexes, num_sockets);
+    simple_plus_prover_attest(attest_req, attest_req_len, sockets, num_sockets);
 }
 
-extern void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets);
-void sys_simple_plus_prover_collect(sa_simple_plus_prover_collect_args_t *args)
+extern void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets);
+void sys_simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets)
 {
-    simple_plus_prover_collect(
-        args->collect_req,
-        args->collect_req_len,
-        args->sender_sock,
-        args->sender_mutex,
-        args->sockets,
-        args->mutexes,
-        args->num_sockets
-    );
+    simple_plus_prover_collect(collect_req, collect_req_len, sender_sock, sockets, num_sockets);
 }
 
 // Return the gateway ip of the parent node

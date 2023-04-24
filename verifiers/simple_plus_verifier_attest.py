@@ -16,10 +16,10 @@ CMD_SIMPLE_PLUS_ATTEST  = 0x07.to_bytes(1, byteorder="little")
 
 # Valid states of the fake memory region on the prover
 VALID_STATES_RAW = [
-    b'\x00' * 1024,
-    b'\x01' * 1024,
-    b'\x02' * 1024,
-    b'\x03' * 1024,
+    b'\x01' * (64 * 1024),
+    b'\x02' * (64 * 1024),
+    b'\x03' * (64 * 1024),
+    b'\x04' * (64 * 1024),
 ]
 
 # Get id of node we are connected to from CLI args

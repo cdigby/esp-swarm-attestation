@@ -18,7 +18,7 @@ static DRAM_ATTR uint8_t k_attest[SIMPLE_KEY_SIZE] =    // Attestation key
 
 static DRAM_ATTR uint32_t cp = 0;             // Prover counter
 
-void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex)
+void simple_prover(uint8_t *msg, size_t msg_len, int response_sock)
 {
     if (msg_len != SIMPLE_MSG_LEN)
     {
@@ -81,7 +81,7 @@ void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response
             }
 
             // Send report
-            sa_protected_send(response_sock, response_sock_mutex, report, SIMPLE_REPORT_LEN);
+            sa_protected_send(response_sock, report, SIMPLE_REPORT_LEN);
             ESP_LOGI(TAG_SIMPLE, "Report sent");
         }
         else

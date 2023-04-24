@@ -45,4 +45,4 @@
 #define SIMPLE_HMAC_DATA_CP_OFFSET    (SIMPLE_HMAC_DATA_VALUE_OFFSET + SIMPLE_HMAC_DATA_VALUE_LEN)
 #define SIMPLE_HMAC_DATA_NONCE_OFFSET (SIMPLE_HMAC_DATA_CP_OFFSET + SIMPLE_HMAC_DATA_CP_LEN)
 
-void simple_prover(uint8_t *msg, size_t msg_len, int response_sock, int response_sock_mutex);
+void simple_prover(uint8_t *msg, size_t msg_len, int response_sock);

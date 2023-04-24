@@ -33,65 +33,44 @@ static void sa_comms_drop_connection(tcp_conn_t *conn)
 
 static bool sa_comms_send(tcp_conn_t *conn, uint8_t *data, size_t len)
 {
-    if (sa_protected_mutex_lock(conn->sock_mutex) == true)
+    ssize_t sent = send(conn->sock, data, len, 0);
+    if (sent == -1)
     {
-        ssize_t sent = send(conn->sock, data, len, 0);
-        if (sent == -1)
-        {
-            sa_comms_drop_connection(conn);
-            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
-            sa_protected_mutex_unlock(conn->sock_mutex);
-            return false;
-        }
-        else if (sent < len)
-        {
-            sa_comms_drop_connection(conn);
-            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
-            sa_protected_mutex_unlock(conn->sock_mutex);
-            return false;
-        }
-
-        sa_protected_mutex_unlock(conn->sock_mutex);
-        return true;
-    }
-    else
-    {
-        ESP_LOGE(TAG_COMMS, "Could not acquire socket mutex for %s, this probably indicates a bug", conn->name);
+        sa_comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
         return false;
     }
+    else if (sent < len)
+    {
+        sa_comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete send", conn->name);
+        sa_protected_mutex_unlock(conn->sock_mutex);
+        return false;
+    }
+
+    return true;
 }
 
 static bool sa_comms_recv(tcp_conn_t *conn, uint8_t *rx_buf, size_t len)
 {
-    if (sa_protected_mutex_lock(conn->sock_mutex) == true)
+    ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
+    if (rlen == -1)
     {
-        ssize_t rlen = recv(conn->sock, rx_buf, len, MSG_WAITALL);
-        if (rlen == -1)
-        {
-            sa_comms_drop_connection(conn);
-            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
-            sa_protected_mutex_unlock(conn->sock_mutex);
-            return false;
-        }
-        else if (rlen < len)
-        {
-            sa_comms_drop_connection(conn);
-            ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
-            sa_protected_mutex_unlock(conn->sock_mutex);
-            return false;
-        }
-
-        sa_protected_mutex_unlock(conn->sock_mutex);
-        return true;
-    }
-    else
-    {
-        ESP_LOGE(TAG_COMMS, "Could not acquire socket mutex for %s, this probably indicates a bug", conn->name);
+        sa_comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to socket error (%s)", conn->name, strerror(errno));
         return false;
     }
+    else if (rlen < len)
+    {
+        sa_comms_drop_connection(conn);
+        ESP_LOGW(TAG_COMMS, "Connection with %s dropped due to incomplete receive", conn->name);
+        return false;
+    }
+
+    return true;
 }
 
-static size_t sa_comms_get_socks_and_mutexes(tcp_conn_t *exclude, int socks_out[TCP_SERVER_MAX_CONNS + 1], int mutexes_out[TCP_SERVER_MAX_CONNS + 1])
+static size_t sa_comms_get_and_lock_socks(tcp_conn_t *exclude, int socks_out[TCP_SERVER_MAX_CONNS + 1])
 {
     size_t i = 0;
     if (&tcp_client.server != exclude)
@@ -99,7 +78,7 @@ static size_t sa_comms_get_socks_and_mutexes(tcp_conn_t *exclude, int socks_out[
         if (tcp_client.server.open == true)
         {
             socks_out[i] = tcp_client.server.sock;
-            mutexes_out[i] = tcp_client.server.sock_mutex;
+            sa_protected_mutex_lock(tcp_client.server.sock_mutex);
             i++;
         }
     }
@@ -112,7 +91,7 @@ static size_t sa_comms_get_socks_and_mutexes(tcp_conn_t *exclude, int socks_out[
             if (strcmp(tcp_server.conns[j].name, "VERIFIER") != 0)
             {
                 socks_out[i] = tcp_server.conns[j].sock;
-                mutexes_out[i] = tcp_server.conns[j].sock_mutex;
+                sa_protected_mutex_lock(tcp_server.conns[j].sock_mutex);
                 i++;
             }       
         }
@@ -121,17 +100,42 @@ static size_t sa_comms_get_socks_and_mutexes(tcp_conn_t *exclude, int socks_out[
     return i;
 }
 
+static void sa_comms_unlock_socks(int *socks, size_t num_socks)
+{
+    for (int i = 0; i < num_socks; i++)
+    {
+        if (socks[i] == tcp_client.server.sock)
+        {
+            sa_protected_mutex_unlock(tcp_client.server.sock_mutex);
+        }
+
+        for (int j = 0; j < TCP_SERVER_MAX_CONNS; j++)
+        {
+            if (socks[i] == tcp_server.conns[j].sock)
+            {
+                sa_protected_mutex_unlock(tcp_server.conns[j].sock_mutex);
+            }
+        }
+    }
+}
+
 
 // Process the incoming command for conn, returning true
 // It is assumed that conn->sock has been polled and is ready to read
 // If an error occurs, conn will be dropped and false will be returned
 static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
 {
+    sa_protected_mutex_lock(conn->sock_mutex);
+
     // Receive command code
-    if (sa_comms_recv(conn, rx_buf, 1) == false) return false;
+    if (sa_comms_recv(conn, rx_buf, 1) == false)
+    {
+        sa_protected_mutex_unlock(conn->sock_mutex);
+        return false;
+    }
 
     // Process
-    bool success = true;
+    bool success = false;
     uint8_t cmd_code = rx_buf[0];
     switch (cmd_code)
     {
@@ -146,6 +150,8 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
             };
 
             xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+
+            success = true;
         }
         break;
 
@@ -153,31 +159,36 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
         {
             // ESP_LOGI(TAG_COMMS, "Got heartbeat response from %s", conn->name);
             conn->heartbeat = true;
+            success = true;
         }
         break;
 
         case CMD_PRINT_MESSAGE:
         {
-            if (sa_comms_recv(conn, rx_buf, 1) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, 1) == false) break;
             uint8_t msg_len = rx_buf[0];
 
-            if (sa_comms_recv(conn, rx_buf, msg_len) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, msg_len) == false) break;
             ESP_LOGI(TAG_COMMS, "Received message: \"%s\" from %s", rx_buf, conn->name);
+
+            success = true;
         }
         break;
 
         case CMD_SIMPLE_ATTEST:
         {
-            if (sa_comms_recv(conn, rx_buf, 2) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, 2) == false) break;
             uint16_t msg_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
 
-            if (sa_comms_recv(conn, rx_buf, msg_len) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, msg_len) == false) break;
 
             ESP_LOGI(TAG_COMMS, "Received SIMPLE attestation request from %s", conn->name);
 
             // Make syscall - execute algorithm in protected space
-            simple_prover(rx_buf, msg_len, conn->sock, conn->sock_mutex);
+            simple_prover(rx_buf, msg_len, conn->sock);
             ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
+
+            success = true;
         }
         break;
 
@@ -185,51 +196,55 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
         {
             sa_comms_drop_connection(conn);
             ESP_LOGI(TAG_COMMS, "Connection with %s closed gracefully", conn->name);
-
-            // Need to return false so that caller knows connection was dropped.
-            return false;
         }
         break;
 
         case CMD_SIMPLE_PLUS_ATTEST:
         {
-            if (sa_comms_recv(conn, rx_buf, 2) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, 2) == false) break;
             uint16_t attest_req_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
 
-            if (sa_comms_recv(conn, rx_buf, attest_req_len) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, attest_req_len) == false) break;
 
             ESP_LOGI(TAG_COMMS, "Received SIMPLE+ attestation request from %s", conn->name);
 
-            // Generate array of all connected nodes
+            // Generate array of all connected nodes, lock their sockets
             int socks[TCP_SERVER_MAX_CONNS + 1];    // + 1 for TCP client's server
-            int mutexes[TCP_SERVER_MAX_CONNS + 1];
-            size_t num_socks = sa_comms_get_socks_and_mutexes(conn, socks, mutexes);
+            size_t num_socks = sa_comms_get_and_lock_socks(conn, socks);
 
             // Make syscall - execute algorithm in protected space
-            simple_plus_prover_attest(rx_buf, attest_req_len, socks, mutexes, num_socks);
-            ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
+            simple_plus_prover_attest(rx_buf, attest_req_len, socks, num_socks);
+            sa_comms_unlock_socks(socks, num_socks);
+            ESP_LOGI(TAG_COMMS, "Processed SIMPLE+ attestation request from %s", conn->name);
+
+            success = true;
         }
+        break;
 
         case CMD_SIMPLE_PLUS_COLLECT:
         {
-            if (sa_comms_recv(conn, rx_buf, 2) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, 2) == false) break;
             uint16_t collect_req_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
 
-            if (sa_comms_recv(conn, rx_buf, collect_req_len) == false) return false;
+            if (sa_comms_recv(conn, rx_buf, collect_req_len) == false) break;
 
             ESP_LOGI(TAG_COMMS, "Received SIMPLE+ collection request from %s", conn->name);
 
-            // Generate array of all connected nodes
+            // Generate array of all connected nodes, lock their sockets
             int socks[TCP_SERVER_MAX_CONNS + 1];    // + 1 for TCP client's server
-            int mutexes[TCP_SERVER_MAX_CONNS + 1];
-            size_t num_socks = sa_comms_get_socks_and_mutexes(conn, socks, mutexes);
+            size_t num_socks = sa_comms_get_and_lock_socks(conn, socks);
 
             // Make syscall - execute algorithm in protected space
-            simple_plus_prover_collect(rx_buf, collect_req_len, conn->sock, conn->sock_mutex, socks, mutexes, num_socks);
-            ESP_LOGI(TAG_COMMS, "Processed SIMPLE attestation request from %s", conn->name);
+            simple_plus_prover_collect(rx_buf, collect_req_len, conn->sock, socks, num_socks);
+            sa_comms_unlock_socks(socks, num_socks);
+            ESP_LOGI(TAG_COMMS, "Processed SIMPLE+ collection request from %s", conn->name);
+
+            success = true;
         }
+        break;
     }
 
+    sa_protected_mutex_unlock(conn->sock_mutex);
     return success;
 }
 
@@ -241,6 +256,7 @@ static bool sa_comms_cmd_process_outgoing(tcp_conn_t *conn)
     if (xQueueReceive(conn->cmd_queue, &cmd, 0) == pdFALSE) return true; // Nothing to process
 
     // Process
+    sa_protected_mutex_lock(conn->sock_mutex);
     bool success = true;
     switch (cmd.cmd_code)
     {
@@ -281,6 +297,7 @@ static bool sa_comms_cmd_process_outgoing(tcp_conn_t *conn)
         free(cmd.data);
     }
     
+    sa_protected_mutex_unlock(conn->sock_mutex);
     return success;
 }
 
@@ -447,24 +464,28 @@ static void tcp_server_task(void *pvParameters)
                     continue;
                 }
 
-                if ((conn->open == true) && (conn->heartbeat == false))
+                if (sa_protected_mutex_lock(conn->sock_mutex) == true)
                 {
-                    // No response to heartbeat, drop connection
-                    sa_comms_drop_connection(conn);
-                    ESP_LOGW(TAG_COMMS, "[server] Dropped %s as it did not respond to heartbeat within %dms", conn->name, COMMS_HEARTBEAT_TIMEOUT_MS);
-                }
-                else if ((conn->open == true) && (conn->heartbeat == true))
-                {
-                    // Send next heartbeat
-                    comms_cmd_t cmd =
+                    if ((conn->open == true) && (conn->heartbeat == false))
                     {
-                        .cmd_code = CMD_HEARTBEAT_REQUEST,
-                        .data_len = 0,
-                        .data = NULL,
-                    };
+                        // No response to heartbeat, drop connection
+                        sa_comms_drop_connection(conn);
+                        ESP_LOGW(TAG_COMMS, "[server] Dropped %s as it did not respond to heartbeat within %dms", conn->name, COMMS_HEARTBEAT_TIMEOUT_MS);
+                    }
+                    else if ((conn->open == true) && (conn->heartbeat == true))
+                    {
+                        // Send next heartbeat
+                        comms_cmd_t cmd =
+                        {
+                            .cmd_code = CMD_HEARTBEAT_REQUEST,
+                            .data_len = 0,
+                            .data = NULL,
+                        };
 
-                    xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+                        xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+                    }
                 }
+                sa_protected_mutex_unlock(conn->sock_mutex);
             }
 
             // Reset timer
@@ -570,23 +591,28 @@ static void tcp_client_task(void *pvParameters)
             // 4) DROP SERVER CONNECTION IF IT DID NOT RESPOND TO HEARTBEAT
             if (sa_comms_get_time_ms() - tcp_client.heartbeat_timer > COMMS_HEARTBEAT_TIMEOUT_MS)
             {   
-                if (tcp_client.server.heartbeat == false)
+                if (sa_protected_mutex_lock(tcp_client.server.sock_mutex) == true)
                 {
-                    // No response to heartbeat, drop connection
-                    ESP_LOGW(TAG_COMMS, "[client] Server did not respond to heartbeat within %dms", COMMS_HEARTBEAT_TIMEOUT_MS);
-                    break;
-                }
-                else
-                {
-                    // Send next heartbeat
-                    comms_cmd_t cmd =
+                    if (tcp_client.server.heartbeat == false)
                     {
-                        .cmd_code = CMD_HEARTBEAT_REQUEST,
-                        .data_len = 0,
-                        .data = NULL,
-                    };
-                    xQueueSendToBack(tcp_client.server.cmd_queue, &cmd, 0);
+                        // No response to heartbeat, drop connection
+                        ESP_LOGW(TAG_COMMS, "[client] Server did not respond to heartbeat within %dms", COMMS_HEARTBEAT_TIMEOUT_MS);
+                        sa_protected_mutex_unlock(tcp_client.server.sock_mutex);
+                        break;
+                    }
+                    else
+                    {
+                        // Send next heartbeat
+                        comms_cmd_t cmd =
+                        {
+                            .cmd_code = CMD_HEARTBEAT_REQUEST,
+                            .data_len = 0,
+                            .data = NULL,
+                        };
+                        xQueueSendToBack(tcp_client.server.cmd_queue, &cmd, 0);
+                    }
                 }
+                sa_protected_mutex_unlock(tcp_client.server.sock_mutex);
 
                 // Reset timer
                 tcp_client.heartbeat_timer = sa_comms_get_time_ms();

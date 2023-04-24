@@ -55,51 +55,43 @@ void sa_protected_mutex_unlock(int mutex_handle)
     }
 } 
 
-void sa_protected_send(int sock, int sock_mutex, uint8_t *data, size_t data_len)
+void sa_protected_send(int sock, uint8_t *data, size_t data_len)
 {
-    if (sa_protected_mutex_lock(sock_mutex) == true)
-    {
-        send(sock, data, data_len, 0);
-        sa_protected_mutex_unlock(sock_mutex);
-    }
+
+    send(sock, data, data_len, 0);
 }
 
-int sa_protected_recv(int sock, int sock_mutex, uint8_t *rx_buf, size_t len)
+int sa_protected_recv(int sock, uint8_t *rx_buf, size_t len)
 {
-    if (sa_protected_mutex_lock(sock_mutex) == true)
+    struct pollfd sock_poll = 
     {
-        struct pollfd sock_poll = 
-        {
-            .fd = sock,
-            .events = POLLIN,
-            .revents = 0,
-        };
+        .fd = sock,
+        .events = POLLIN,
+        .revents = 0,
+    };
 
-        poll(&sock_poll, 1, 0);
-        if (sock_poll.revents & POLLIN)
-        {
-            sa_protected_mutex_unlock(sock_mutex);
-            return recv(sock, rx_buf, len, MSG_WAITALL);
-        }
-        else
-        {
-            sa_protected_mutex_unlock(sock_mutex);
-            return 0;
-        } 
+    poll(&sock_poll, 1, 0);
+    if (sock_poll.revents & POLLIN)
+    {
+        return recv(sock, rx_buf, len, MSG_WAITALL);
     }
+    else
+    {
+        return 0;
+    } 
 
     return -1;
 }
 
-void sa_protected_broadcast(uint8_t *data, size_t data_len, int *sockets, int *mutexes, size_t num_sockets)
+void sa_protected_broadcast(uint8_t *data, size_t data_len, int *sockets, size_t num_sockets)
 {
-    if (sockets == NULL || mutexes == NULL || num_sockets == 0)
+    if (sockets == NULL || num_sockets == 0)
     {
         return;
     }
 
     for (int i = 0; i < num_sockets; i++)
     {
-        sa_protected_send(sockets[i], mutexes[i], data, data_len);
+        sa_protected_send(sockets[i], data, data_len);
     }
 }

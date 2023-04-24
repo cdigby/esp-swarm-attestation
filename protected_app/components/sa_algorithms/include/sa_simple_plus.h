@@ -47,5 +47,5 @@
 // SIMPLE+ report
 #define SIMPLE_PLUS_INITIAL_REPORT_LEN    ((NODE_ID / 8) + 1)    // We need 1 bit per node
 
-void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, int *mutexes, size_t num_sockets);
-void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int sender_mutex, int *sockets, int *mutexes, size_t num_sockets);
+void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets);
+void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets);
