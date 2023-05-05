@@ -1,0 +1,3 @@
+[submodule "esp-privilege-separation"]
+	path = esp-privilege-separation
+	url = https://github.com/espressif/esp-privilege-separation.git

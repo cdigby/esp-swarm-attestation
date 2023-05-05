@@ -24,12 +24,12 @@ endif()
 
 set(USER_APP_BUILD 1)
 
-set(ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)
+# set(ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)
 
 set(EXTRA_COMPONENT_DIRS
-    ${ROOT_DIR}/esp/esp-privilege-separation/components/user
-    ${ROOT_DIR}/esp/esp-privilege-separation/components/user/idf_stubs
-    ${ROOT_DIR}/esp/esp-privilege-separation/components/shared
+    ${CMAKE_CURRENT_LIST_DIR}/../esp-privilege-separation/components/user
+    ${CMAKE_CURRENT_LIST_DIR}/../esp-privilege-separation/components/user/idf_stubs
+    ${CMAKE_CURRENT_LIST_DIR}/../esp-privilege-separation/components/shared
     ${CMAKE_CURRENT_LIST_DIR}/../components
     ${CMAKE_CURRENT_LIST_DIR}/components
 )
