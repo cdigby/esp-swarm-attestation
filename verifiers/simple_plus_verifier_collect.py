@@ -26,14 +26,14 @@ if len(sys.argv) != 3:
 NODE_ID = None
 try :
     NODE_ID = int(sys.argv[1])
-except ValueError:
+except Exception:
     print("NODE_ID must be an integer")
     sys.exit(1)
 
 TIMEOUT_MS = None
 try :
     TIMEOUT_MS = int(sys.argv[2])
-except ValueError:
+except Exception:
     print("TIMEOUT_MS must be an integer")
     sys.exit(1)
 

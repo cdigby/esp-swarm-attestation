@@ -24,36 +24,32 @@ CMD_NODE_NAME     = 0x01.to_bytes(1, byteorder="little")
 CMD_SIMPLE_ATTEST = 0x05.to_bytes(1, byteorder="little")
 CMD_CLOSE_CONN    = 0x06.to_bytes(1, byteorder="little")
 
-# Fake memory region considered the valid state for the prover
-# Prover considered valid if the hash of FAKE_MEMORY_REGION is equal to the hash of FAKE_MEMORY_REGION on the prover
-# The contents of FAKE_MEMORY_REGION on the prover can be configured in sa_build_config.h (0 by default)
-FAKE_MEMORY_REGION = b'\x00' * 1024         # VALID
-# FAKE_MEMORY_REGION = b'\xff' * 1024       # INVALID
-
-# Get node id from CLI args
+# Get NODE_ID and VALID_STATE from CLI args
 if len(sys.argv) != 3:
-    print("Usage: python3 simple_verifier.py NODE_ID MEMORY_VALUE")
+    print("Usage: python3 simple_verifier.py NODE_ID VALID_STATE")
     sys.exit(1)
 
 NODE_ID = None
 try :
     NODE_ID = int(sys.argv[1])
-except ValueError:
+except Exception:
     print("NODE_ID must be an integer")
     sys.exit(1)
 
-MEMORY_VALUE = None
+VALID_STATE = None
 try :
-    MEMORY_VALUE = int(sys.argv[2])
-except ValueError:
-    print("MEMORY_VALUE must be an integer")
+    VALID_STATE = bytes.fromhex(sys.argv[2])
+except Exception:
+    print("VALID_STATE must be a hex byte e.g. 01 or ab")
     sys.exit(1)
 
-if MEMORY_VALUE > 255:
-    print("MEMORY_VALUE must be <= 255")
+if len(VALID_STATE) != 1:
+    print("VALID_STATE must be a single byte")
     sys.exit(1)
 
-FAKE_MEMORY_REGION = MEMORY_VALUE.to_bytes(1, byteorder="little") * (64 * 1024) 
+# Fake memory region considered the valid state for the prover
+# Prover considered valid if the hash of FAKE_MEMORY_REGION is equal to the hash of FAKE_MEMORY_REGION on the prover
+FAKE_MEMORY_REGION = VALID_STATE * (64 * 1024) 
 
 # Generate host IP
 HOST = f"192.168.{NODE_ID}.1"

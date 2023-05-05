@@ -14,17 +14,10 @@ CMD_NODE_NAME           = 0x01.to_bytes(1, byteorder="little")
 CMD_CLOSE_CONN          = 0x06.to_bytes(1, byteorder="little")
 CMD_SIMPLE_PLUS_ATTEST  = 0x07.to_bytes(1, byteorder="little")
 
-# Valid states of the fake memory region on the prover
-VALID_STATES_RAW = [
-    b'\x01' * (64 * 1024),
-    b'\x02' * (64 * 1024),
-    b'\x03' * (64 * 1024),
-    b'\x04' * (64 * 1024),
-]
-
-# Get id of node we are connected to from CLI args
-if len(sys.argv) != 2:
-    print("Usage: python3 simple_verifier.py NODE_ID")
+# Get NODE_ID and VALID_STATES from CLI args
+# VALID_STATES must be comma-separated hex bytes e.g. 01,02,ab,cd
+if len(sys.argv) != 3:
+    print("Usage: python3 simple_verifier.py NODE_ID VALID_STATES")
     sys.exit(1)
 
 NODE_ID = None
@@ -32,6 +25,21 @@ try :
     NODE_ID = int(sys.argv[1])
 except ValueError:
     print("NODE_ID must be an integer")
+    sys.exit(1)
+
+# Generate valid states of the fake memory region on the prover
+VALID_STATES_RAW = []
+try:
+    for v in sys.argv[2].split(","):
+        v_b = bytes.fromhex(v)
+        if len(v_b) != 1:
+            print("Each valid state must be a single byte")
+            sys.exit(1)
+
+        VALID_STATES_RAW.append(v_b * (64 * 1024))
+
+except Exception:
+    print("VALID_STATES must be comma-separated hex bytes e.g. 01,02,ab,cd")
     sys.exit(1)
 
 # Generate host IP

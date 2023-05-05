@@ -9,7 +9,7 @@
 // To change a node's broadcasted name, change NODE_SSID
 // To change a node's parent name, change NODE_PARENT
 // To change value that a node's fake app memory is initialised to, change NODE_FAKE_MEMORY_CONTENTS
-//      This will affect the attestation result
+//      This will affect the attestation result, and will likely require modification to the verifier software.
 
 //////////////////////////////////////
 #define NODE_PASSWORD                   "test1234"      // Password for connecting to node's access point
