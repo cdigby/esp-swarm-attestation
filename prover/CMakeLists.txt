@@ -5,8 +5,8 @@
 cmake_minimum_required(VERSION 3.5)
 
 set(EXTRA_COMPONENT_DIRS
-    ${CMAKE_CURRENT_LIST_DIR}/esp-privilege-separation/components/protected
-    ${CMAKE_CURRENT_LIST_DIR}/esp-privilege-separation/components/shared
+    ${CMAKE_CURRENT_LIST_DIR}/../esp-privilege-separation/components/protected
+    ${CMAKE_CURRENT_LIST_DIR}/../esp-privilege-separation/components/shared
     ${CMAKE_CURRENT_LIST_DIR}/protected_app
     ${CMAKE_CURRENT_LIST_DIR}/protected_app/components
 )

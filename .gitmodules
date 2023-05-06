@@ -1,3 +1,6 @@
 [submodule "esp-privilege-separation"]
 	path = esp-privilege-separation
 	url = https://github.com/espressif/esp-privilege-separation.git
+[submodule "esp-idf-privilege-separation"]
+	path = esp-idf-privilege-separation
+	url = https://github.com/cdigby/esp-idf-privilege-separation.git
