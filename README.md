@@ -36,7 +36,7 @@ This will install the toolchain to `$HOME/.espressif`.
 
 
 ## Building and flashing the prover software
-To configure the build, modify the definitions in `components/sa_config/sa_build_config.h`.
+The prover software is contained in the `prover` directory. To configure the build, modify the definitions in `components/sa_config/sa_build_config.h`.
 
 There are two global definitions which you may want to modify. In particular, `NODE_ID` must be unique for each prover node that the software is built for:
 | Definition | Description |
