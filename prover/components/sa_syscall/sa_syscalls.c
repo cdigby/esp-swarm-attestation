@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "soc_defs.h"
+
 // #include "esp_map.h"
 // #include "esp_netif.h"
 // #include "esp_wifi.h"
@@ -79,18 +81,44 @@
 extern void simple_prover(uint8_t *msg, size_t msg_len, int response_sock);
 void sys_simple_prover(uint8_t *msg, size_t msg_len, int response_sock)
 {
+    // Verify that the bounds of msg are valid userspace DRAM addresses
+    if (!is_valid_udram_addr((void *)msg) || !is_valid_udram_addr((void *)msg + msg_len))
+    {
+        return;
+    }
+
     simple_prover(msg, msg_len, response_sock);
 }
 
 extern void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets);
 void sys_simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets)
 {
+    // Verify that the bounds of attest_req and sockets are valid userspace DRAM addresses
+    if (!is_valid_udram_addr((void *)attest_req) || !is_valid_udram_addr((void *)attest_req + attest_req_len))
+    {
+        return;
+    }
+    if (!is_valid_udram_addr((void *)sockets) || !is_valid_udram_addr((void *)sockets + num_sockets))
+    {
+        return;
+    }
+
     simple_plus_prover_attest(attest_req, attest_req_len, sockets, num_sockets);
 }
 
 extern void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets);
 void sys_simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets)
 {
+    // Verify that the bounds of collect_req and sockets are valid userspace DRAM addresses
+    if (!is_valid_udram_addr((void *)collect_req) || !is_valid_udram_addr((void *)collect_req + collect_req_len))
+    {
+        return;
+    }
+    if (!is_valid_udram_addr((void *)sockets) || !is_valid_udram_addr((void *)sockets + num_sockets))
+    {
+        return;
+    }
+
     simple_plus_prover_collect(collect_req, collect_req_len, sender_sock, sockets, num_sockets);
 }
 
