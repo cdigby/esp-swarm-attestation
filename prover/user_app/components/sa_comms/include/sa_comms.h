@@ -82,4 +82,5 @@ typedef struct
 } tcp_client_t;
 
 bool sa_comms_init();
+void sa_comms_unicast(tcp_conn_t *conn, comms_cmd_t *cmd);
 void sa_comms_broadcast(comms_cmd_t *cmd);

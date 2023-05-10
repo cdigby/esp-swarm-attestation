@@ -149,7 +149,7 @@ static bool sa_comms_cmd_process_incoming(tcp_conn_t *conn, uint8_t *rx_buf)
                 .data = NULL,
             };
 
-            xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+            sa_comms_unicast(conn, &cmd);
 
             success = true;
         }
@@ -482,7 +482,7 @@ static void tcp_server_task(void *pvParameters)
                             .data = NULL,
                         };
 
-                        xQueueSendToBack(conn->cmd_queue, &cmd, 0);
+                        sa_comms_unicast(conn, &cmd);
                     }
                 }
                 sa_protected_mutex_unlock(conn->sock_mutex);
@@ -609,7 +609,7 @@ static void tcp_client_task(void *pvParameters)
                             .data_len = 0,
                             .data = NULL,
                         };
-                        xQueueSendToBack(tcp_client.server.cmd_queue, &cmd, 0);
+                        sa_comms_unicast(&tcp_client.server, &cmd);
                     }
                 }
                 sa_protected_mutex_unlock(tcp_client.server.sock_mutex);
@@ -733,6 +733,12 @@ bool sa_comms_init()
     return true;
 }
 
+// Send cmd to conn
+void sa_comms_unicast(tcp_conn_t *conn, comms_cmd_t *cmd)
+{
+    xQueueSendToBack(conn->cmd_queue, cmd, 0);
+}
+
 // Broadcast a command to all connections
 // Data pointer is freed before returning
 void sa_comms_broadcast(comms_cmd_t *cmd)
@@ -745,7 +751,7 @@ void sa_comms_broadcast(comms_cmd_t *cmd)
     if (tcp_client.server.open == true)
     {
         sa_comms_clone_cmd(&clone, cmd);
-        xQueueSendToBack(tcp_client.server.cmd_queue, &clone, 0);
+        sa_comms_unicast(&tcp_client.server, &clone);
     }
 
     // Send to any clients connected to the server
@@ -755,7 +761,7 @@ void sa_comms_broadcast(comms_cmd_t *cmd)
         if (conn->open == true)
         {
             sa_comms_clone_cmd(&clone, cmd);
-            xQueueSendToBack(conn->cmd_queue, &clone, 0);
+            sa_comms_unicast(conn, &clone);
         }
     }
 
