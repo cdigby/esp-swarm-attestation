@@ -2,8 +2,6 @@
 
 static const char *TAG_USER = "USERSPACE LOG";
 
-// #define TEST_MSG "Hello!"
-
 void user_main()
 {
     ESP_LOGI(TAG_USER, "Userspace start");
@@ -11,18 +9,10 @@ void user_main()
     // Wifi is initialised before user app boot, so we can start comms immediately
     sa_comms_init();
 
+    // User app main loop: additional functionality could go here in the future
+    // user_main() must never return
     while (1)
     {
-        // User code main loop
-
-        // comms_cmd_t cmd;
-        // cmd.cmd_code = CMD_PRINT_MESSAGE;
-        // cmd.data_len = strlen(TEST_MSG) + 1;
-        // cmd.data = malloc(cmd.data_len);
-        // strcpy((char*)cmd.data, TEST_MSG);
-
-        // sa_comms_broadcast(&cmd);
-
-        vTaskDelay(10000);
+        vTaskDelay(1000);
     }
 }
