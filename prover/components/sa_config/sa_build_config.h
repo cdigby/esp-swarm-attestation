@@ -1,10 +1,8 @@
 #pragma once
 
 // Change this to the ID of the node we want to build for
-// 1 = A, 2 = B, etc.
+// Node IDs must start from 1 (instead of 0) for IP address generation, or verifier will not be able to connect
 #define NODE_ID 1
-
-// Node ids need to start from 1 (instead of 0) for IP address generation, or verifier will not be able to connect
 
 // To change a node's broadcasted name, change NODE_SSID
 // To change a node's parent name, change NODE_PARENT
