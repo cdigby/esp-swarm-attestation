@@ -45,7 +45,14 @@ void simple_prover(uint8_t *msg, size_t msg_len, int response_sock)
     {
         // Check received HMAC against locally computed HMAC
         uint8_t local_msg_data_hmac[SIMPLE_HMAC_LEN];
-        Hacl_HMAC_compute_sha2_256(local_msg_data_hmac, k_auth, SIMPLE_KEY_SIZE, msg, SIMPLE_MSG_LEN - SIMPLE_MSG_HMAC_LEN);
+        Hacl_HMAC_compute_sha2_256(
+            local_msg_data_hmac,
+            k_auth, 
+            SIMPLE_KEY_SIZE,
+            msg,
+            SIMPLE_MSG_LEN - SIMPLE_MSG_HMAC_LEN
+        );
+        
         if (memcmp(local_msg_data_hmac, h, SIMPLE_HMAC_LEN) == 0)
         {
             // Increment counter
@@ -69,14 +76,30 @@ void simple_prover(uint8_t *msg, size_t msg_len, int response_sock)
             {
                 report[SIMPLE_REPORT_VALUE_OFFSET] = 1;
                 report_hmac_data_buf[SIMPLE_HMAC_DATA_VALUE_OFFSET] = 1;
-                Hacl_HMAC_compute_sha2_256(report + SIMPLE_REPORT_HMAC_OFFSET, k_auth, SIMPLE_KEY_SIZE, report_hmac_data_buf, SIMPLE_HMAC_DATA_LEN);
+
+                Hacl_HMAC_compute_sha2_256(
+                    report + SIMPLE_REPORT_HMAC_OFFSET,
+                    k_auth,
+                    SIMPLE_KEY_SIZE,
+                    report_hmac_data_buf,
+                    SIMPLE_HMAC_DATA_LEN
+                );
+
                 ESP_LOGI(TAG_SIMPLE, "Software state is valid");
             }
             else
             {
                 report[SIMPLE_REPORT_VALUE_OFFSET] = 0;
                 report_hmac_data_buf[SIMPLE_HMAC_DATA_VALUE_OFFSET] = 0;
-                Hacl_HMAC_compute_sha2_256(report + SIMPLE_REPORT_HMAC_OFFSET, k_auth, SIMPLE_KEY_SIZE, report_hmac_data_buf, SIMPLE_HMAC_DATA_LEN);
+
+                Hacl_HMAC_compute_sha2_256(
+                    report + SIMPLE_REPORT_HMAC_OFFSET,
+                    k_auth,
+                    SIMPLE_KEY_SIZE,
+                    report_hmac_data_buf,
+                    SIMPLE_HMAC_DATA_LEN
+                );
+
                 ESP_LOGW(TAG_SIMPLE, "Software state is invalid");
             }
 

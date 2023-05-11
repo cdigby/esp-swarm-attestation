@@ -70,7 +70,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     # Compute HMAC and construct collect_req
     data = TIMEOUT_MS.to_bytes(2, byteorder="little")
-    h = hmac.digest(get_k_col(), data, hashlib.sha256)
+    k_col = get_k_col()
+    h = hmac.digest(k_col, data, hashlib.sha256)
     collect_req = data + h
 
     # Send collect_req
@@ -79,12 +80,19 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     # Receive ACK (we don't need to do anything with it)
     print("Waiting for ACK...")
-    ack = s.recv(1)
-    if ack != CMD_SIMPLE_PLUS_COLLECT_ACK:
+    ack = s.recv(1 + SIMPLE_HMAC_LEN)
+    if ack[:1] != CMD_SIMPLE_PLUS_COLLECT_ACK:
         print(f"Invalid command: 0x{ack.hex()}")
         sys.exit(1)
 
     print("Received ACK")
+
+    local_ack_hmac = hmac.digest(k_col, ack[:1], hashlib.sha256)
+    if hmac.compare_digest(ack[1:1+SIMPLE_HMAC_LEN], local_ack_hmac):
+        print("ACK HMAC verified")
+    else:
+        print("ACK HMAC mismatch")
+        sys.exit(1)
 
     # Receive report
     print("Waiting for report...")
@@ -99,6 +107,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     report = s.recv(report_len)
     if len(report) != report_len:
         print(f"Received report too short: {len(report)}")
+        sys.exit(1)
+
+    report_hmac = s.recv(SIMPLE_HMAC_LEN)
+    if len(report_hmac) != SIMPLE_HMAC_LEN:
+        print(f"Received report HMAC too short: {len(report_hmac)}")
+        sys.exit(1)
+
+    local_report_hmac = hmac.digest(k_col, cmd + report_len.to_bytes(2, byteorder='little') + report, hashlib.sha256)
+    if hmac.compare_digest(report_hmac, local_report_hmac):
+        print("Report HMAC verified")
+    else:
+        print("Report HMAC mismatch")
         sys.exit(1)
 
     print("Received report:")

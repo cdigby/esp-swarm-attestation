@@ -70,6 +70,7 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
             attest_req,
             SIMPLE_PLUS_ATTESTREQ_CV_LEN + SIMPLE_PLUS_ATTESTREQ_NONCE_LEN + SIMPLE_PLUS_ATTESTREQ_VSSLEN_LEN + vss_len
         );
+
         if (memcmp(local_attest_req_hmac, h, SIMPLE_HMAC_LEN) == 0)
         {
             // Broadcast attest_req to other nodes
@@ -163,11 +164,22 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         collect_req,
         collect_req_len - SIMPLE_HMAC_LEN
     );
+
     if (memcmp(local_collect_req_hmac, h, SIMPLE_HMAC_LEN) == 0)
     {
         // Send ACK to sender
-        uint8_t ack_buf = CMD_SIMPLE_PLUS_COLLECT_ACK;
-        sa_protected_send(sender_sock, &ack_buf, 1);
+        uint8_t ack_buf[1 + SIMPLE_HMAC_LEN];
+        ack_buf[0] = CMD_SIMPLE_PLUS_COLLECT_ACK;
+
+        Hacl_HMAC_compute_sha2_256(
+            ack_buf + 1,
+            k_col,
+            SIMPLE_HMAC_LEN,
+            ack_buf,
+            1
+        );
+
+        sa_protected_send(sender_sock, ack_buf, 1 + SIMPLE_HMAC_LEN);
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] ACK sent");
 
         // Broadcast collect_req to other nodes
@@ -181,8 +193,8 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] Broadcasted collect_req to %d other nodes", num_sockets);
 
         // Wait for ACKs from other nodes, will wait until timeout or until all connected nodes have sent an ACK
-        uint8_t rx_buf[2];
-        memset(rx_buf, 0, 2);
+        uint8_t rx_buf[1 + SIMPLE_HMAC_LEN];
+        memset(rx_buf, 0, 1 + SIMPLE_HMAC_LEN);
 
         // Use this array to flag as true sockets that have received an ACK
         // sockets[i] corresponds to got_ack[i]
@@ -206,13 +218,29 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 }
 
                 // Try and receive an ACK
-                if (sa_protected_recv(sockets[i], rx_buf, 1) != 1)
+                if (sa_protected_recv(sockets[i], rx_buf, 1 + SIMPLE_HMAC_LEN) != 1 + SIMPLE_HMAC_LEN)
                 {
                     continue;
                 }
 
                 if (rx_buf[0] == CMD_SIMPLE_PLUS_COLLECT_ACK)
                 {
+                    // Check HMAC
+                    uint8_t local_ack_hmac[SIMPLE_HMAC_LEN];
+                    Hacl_HMAC_compute_sha2_256(
+                        local_ack_hmac,
+                        k_col,
+                        SIMPLE_HMAC_LEN,
+                        rx_buf,
+                        1
+                    );
+
+                    if (memcmp(local_ack_hmac, rx_buf + 1, SIMPLE_HMAC_LEN) != 0)
+                    {
+                        ESP_LOGE(TAG_SIMPLE_PLUS, "[collect] HMAC mismatch getting ACK from socket %d", i);
+                        continue;
+                    }
+
                     got_ack[i] = true;
                     num_acks++;
                 }
@@ -237,7 +265,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         }
 
         // Aggregate other reports
-        memset(rx_buf, 0, 2);
+        memset(rx_buf, 0, 1 + SIMPLE_HMAC_LEN);
 
         // As before, we use got_report to flag sockets that have sent a report
         int num_reports = 0;
@@ -282,11 +310,31 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 }
 
                 uint16_t report_len = (uint16_t)rx_buf[0] | ((uint16_t)rx_buf[1] << 8);
-                uint8_t *report_buf = malloc(report_len);
+                uint8_t *report_buf = malloc(3 + report_len + SIMPLE_HMAC_LEN);
+                report_buf[0] = CMD_SIMPLE_PLUS_COLLECT_REPORT;
+                report_buf[1] = rx_buf[0];
+                report_buf[2] = rx_buf[1];
 
                 // Get report
-                if (sa_protected_recv(sockets[i], report_buf, report_len) != report_len)
+                if (sa_protected_recv(sockets[i], report_buf + 3, report_len + SIMPLE_HMAC_LEN) != report_len + SIMPLE_HMAC_LEN)
                 {
+                    free(report_buf);
+                    continue;
+                }
+
+                // Check HMAC
+                uint8_t local_report_hmac[SIMPLE_HMAC_LEN];
+                Hacl_HMAC_compute_sha2_256(
+                    local_report_hmac,
+                    k_col,
+                    SIMPLE_HMAC_LEN,
+                    report_buf,
+                    3 + report_len
+                );
+
+                if (memcmp(local_report_hmac, report_buf + 3 + report_len, SIMPLE_HMAC_LEN) != 0)
+                {
+                    ESP_LOGE(TAG_SIMPLE_PLUS, "[collect] HMAC mismatch getting report from socket %d", i);
                     free(report_buf);
                     continue;
                 }
@@ -301,7 +349,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 // Aggregate reports
                 for (int i = 0; i < report_len; i++)
                 {
-                    aggregated_report[i] |= report_buf[i];
+                    aggregated_report[i] |= report_buf[3 + i];
                 }
 
                 num_reports++;
@@ -318,12 +366,21 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] Reports received: %d/%d", num_reports, num_acks);
 
         // Send aggregated report
-        uint8_t *tx_buf = malloc(3 + aggregated_report_len);
+        uint8_t *tx_buf = malloc(3 + aggregated_report_len + SIMPLE_HMAC_LEN);
         tx_buf[0] = CMD_SIMPLE_PLUS_COLLECT_REPORT;
         tx_buf[1] = (uint8_t)aggregated_report_len;
         tx_buf[2] = (uint8_t)(aggregated_report_len >> 8);
         memcpy(tx_buf + 3, aggregated_report, aggregated_report_len);
-        sa_protected_send(sender_sock, tx_buf, 3 + aggregated_report_len);
+
+        Hacl_HMAC_compute_sha2_256(
+            tx_buf + 3 + aggregated_report_len,
+            k_col,
+            SIMPLE_HMAC_LEN,
+            tx_buf,
+            3 + aggregated_report_len
+        );
+
+        sa_protected_send(sender_sock, tx_buf, 3 + aggregated_report_len + SIMPLE_HMAC_LEN);
         free(tx_buf);
         ESP_LOGI(TAG_SIMPLE_PLUS, "Aggregated report sent");
 
