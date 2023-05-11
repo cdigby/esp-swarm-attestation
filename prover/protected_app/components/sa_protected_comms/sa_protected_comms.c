@@ -57,7 +57,6 @@ void sa_protected_mutex_unlock(int mutex_handle)
 
 void sa_protected_send(int sock, uint8_t *data, size_t data_len)
 {
-
     send(sock, data, data_len, 0);
 }
 
