@@ -1,4 +1,4 @@
-import os, sys, socket, secrets, hmac, hashlib
+import os, sys, socket, hmac, hashlib, time
 
 # Definitions from sa_shared.h
 SIMPLE_KEY_SIZE         = 32
@@ -76,6 +76,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     # Send collect_req
     print(f"Sending collection request...")
+    start_time = time.perf_counter_ns()
     s.send(CMD_SIMPLE_PLUS_COLLECT + len(collect_req).to_bytes(2, byteorder='little') + collect_req)
 
     # Receive ACK (we don't need to do anything with it)
@@ -97,6 +98,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     # Receive report
     print("Waiting for report...")
     cmd = s.recv(1)
+    stop_time = time.perf_counter_ns()
     if cmd != CMD_SIMPLE_PLUS_COLLECT_REPORT:
         print(f"Invalid command: 0x{cmd.hex()}")
         sys.exit(1)
@@ -121,7 +123,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         print("Report HMAC mismatch")
         sys.exit(1)
 
-    print("Received report:")
+    print(f"Received report in {(stop_time - start_time) / 1000000} ms:")
     for b in report:
         line = []
         for i in range(8):

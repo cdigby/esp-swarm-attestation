@@ -135,6 +135,3 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.send(CMD_CLOSE_CONN)
 
     print("Done!")
-
-
-

@@ -1,4 +1,4 @@
-import os, sys, socket, secrets, hmac, hashlib
+import os, sys, socket, secrets, hmac, hashlib, time
 
 # Definitions from sa_shared.h
 SIMPLE_KEY_SIZE         = 32
@@ -112,12 +112,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     # Send message to node
     print(f"Sending attestation request...")
+    start_time = time.perf_counter_ns()
     s.send(CMD_SIMPLE_ATTEST + len(msg).to_bytes(2, byteorder='little') + msg)
 
     # Get report
     print("Waiting for response...")
     report = s.recv(SIMPLE_REPORT_LEN, socket.MSG_WAITALL)
-    print("Received report")
+    stop_time = time.perf_counter_ns()
+    print(f"Received report in {(stop_time - start_time) / 1000000} ms")
 
     # Verify HMAC of report
     report_value = report[SIMPLE_REPORT_VALUE_OFFSET : SIMPLE_REPORT_VALUE_OFFSET + SIMPLE_REPORT_VALUE_LEN]
@@ -136,6 +138,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     else:
         print("HMAC invalid")
+
     
     # Close connection
     s.send(CMD_CLOSE_CONN)
