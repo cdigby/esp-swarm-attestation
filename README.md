@@ -95,7 +95,7 @@ Executing SIMPLE...
 Counter: 5
 Sending attestation request...
 Waiting for response...
-Received report
+Received report in 273.986086 ms
 HMAC verified
 Report value is 1: prover is in a valid state
 ```
@@ -133,7 +133,7 @@ ACK HMAC verified
 Waiting for report...
 Report contains data for up to 8 nodes
 Report HMAC verified
-Received report:
+Received report in 312.197869 ms:
 [1, 1, 0, 0, 0, 0, 0, 0]
 ```
 
