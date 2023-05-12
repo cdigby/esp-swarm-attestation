@@ -25,13 +25,43 @@
 
 #elif NODE_ID == 3
     #define NODE_SSID                   "SA_DEMO_3"
-    #define NODE_PARENT                 "SA_DEMO_2"
+    #define NODE_PARENT                 "SA_DEMO_1"
     #define NODE_FAKE_MEMORY_CONTENTS   0x03
 
 #elif NODE_ID == 4
     #define NODE_SSID                   "SA_DEMO_4"
-    #define NODE_PARENT                 "SA_DEMO_2"
+    #define NODE_PARENT                 "SA_DEMO_1"
     #define NODE_FAKE_MEMORY_CONTENTS   0x04
+
+#elif NODE_ID == 5
+    #define NODE_SSID                   "SA_DEMO_5"
+    #define NODE_PARENT                 "SA_DEMO_2"
+    #define NODE_FAKE_MEMORY_CONTENTS   0x05
+
+#elif NODE_ID == 6
+    #define NODE_SSID                   "SA_DEMO_6"
+    #define NODE_PARENT                 "SA_DEMO_2"
+    #define NODE_FAKE_MEMORY_CONTENTS   0x06
+
+#elif NODE_ID == 7
+    #define NODE_SSID                   "SA_DEMO_7"
+    #define NODE_PARENT                 "SA_DEMO_3"
+    #define NODE_FAKE_MEMORY_CONTENTS   0x07
+
+#elif NODE_ID == 8
+    #define NODE_SSID                   "SA_DEMO_8"
+    #define NODE_PARENT                 "SA_DEMO_3"
+    #define NODE_FAKE_MEMORY_CONTENTS   0x08
+
+#elif NODE_ID == 9
+    #define NODE_SSID                   "SA_DEMO_9"
+    #define NODE_PARENT                 "SA_DEMO_4"
+    #define NODE_FAKE_MEMORY_CONTENTS   0x09
+
+#elif NODE_ID == 10
+    #define NODE_SSID                   "SA_DEMO_10"
+    #define NODE_PARENT                 "SA_DEMO_4"
+    #define NODE_FAKE_MEMORY_CONTENTS   0x0A
 
 #endif
 
