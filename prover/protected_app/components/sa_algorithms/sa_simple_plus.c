@@ -87,7 +87,7 @@ void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *
             uint8_t vss_prime[SIMPLE_HMAC_LEN];
             compute_software_state(k_attest, SIMPLE_KEY_SIZE, vss_prime);
             bool valid = false;
-            for (int i = 0; i < vss_len * SIMPLE_HMAC_LEN; i += SIMPLE_HMAC_LEN)
+            for (int i = 0; i < vss_len; i += SIMPLE_HMAC_LEN)
             {
                 if (memcmp(vss + i, vss_prime, SIMPLE_HMAC_LEN) == 0)
                 {
