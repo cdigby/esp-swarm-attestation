@@ -42,10 +42,7 @@
 #define SIMPLE_PLUS_COLLECTREQ_LEN          (SIMPLE_PLUS_COLLECTREQ_TIMEOUT_LEN + SIMPLE_PLUS_COLLECTREQ_HMAC_LEN)
 
 #define SIMPLE_PLUS_COLLECTREQ_TIMEOUT_OFFSET 0
-#define SIMPLE_PLUS_COLLECTREQ_HMAC_OFFSET  (SIMPLE_PLUS_COLLECTREQ_TIMEOUT_OFFSET + SIMPLE_PLUS_COLLECTREQ_TIMEOUT_LEN)
-
-// SIMPLE+ report
-#define SIMPLE_PLUS_INITIAL_REPORT_LEN    ((NODE_ID / 8) + 1)    // We need 1 bit per node
+#define SIMPLE_PLUS_COLLECTREQ_HMAC_OFFSET  (SIMPLE_PLUS_COLLECTREQ_TIMEOUT_OFFSET + SIMPLE_PLUS_COLLECTREQ_TIMEOUT_LEN)    
 
 void simple_plus_prover_attest(uint8_t *attest_req, size_t attest_req_len, int *sockets, size_t num_sockets);
 void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, int sender_sock, int *sockets, size_t num_sockets);

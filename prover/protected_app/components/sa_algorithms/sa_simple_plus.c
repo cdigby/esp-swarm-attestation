@@ -254,7 +254,7 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         ESP_LOGI(TAG_SIMPLE_PLUS, "[collect] ACKs received: %d/%d", num_acks, num_sockets);
 
         // Generate this node's attestation report
-        size_t aggregated_report_len = SIMPLE_PLUS_INITIAL_REPORT_LEN;
+        size_t aggregated_report_len = ((NODE_ID - 1) / 8) + 1;    // We need 1 bit per node
         uint8_t *aggregated_report = malloc(aggregated_report_len);
         memset(aggregated_report, 0, aggregated_report_len);
         if (attest == 1)
