@@ -259,9 +259,9 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
         memset(aggregated_report, 0, aggregated_report_len);
         if (attest == 1)
         {
-            // Set the (NODE_ID - 1)th bit of local_report
-            // We subtract 1 as NODE_ID starts at 1 (for IP address generation reasons)
-            aggregated_report[aggregated_report_len - 1] = 0x01 << (NODE_ID - 1);
+            // Set the (NODE_ID - 1)th bit of local_report by left shifting the last byte
+            // We subtract 1 from NODE_ID as NODE_ID starts at 1         
+            aggregated_report[aggregated_report_len - 1] = 0x01 << ((NODE_ID - 1) % 8);
         }
 
         // Aggregate other reports
