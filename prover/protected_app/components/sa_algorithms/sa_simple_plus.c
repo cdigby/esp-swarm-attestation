@@ -343,6 +343,9 @@ void simple_plus_prover_collect(uint8_t *collect_req, size_t collect_req_len, in
                 if (report_len > aggregated_report_len)
                 {
                     aggregated_report = realloc(aggregated_report, report_len);
+                    
+                    // Newly allocated memory needs to be zeroed
+                    memset(aggregated_report + aggregated_report_len, 0, report_len - aggregated_report_len);
                     aggregated_report_len = report_len;
                 }
 
